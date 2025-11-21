@@ -1,7 +1,3 @@
-import keepAlive from "./keep_alive.js";
-keepAlive();
-
-// index.js
 process.on("unhandledRejection", (error) => {
   console.error("Unhandled promise rejection:", error);
 });
@@ -143,7 +139,7 @@ async function createButtonPanel(channel) {
       .setStyle(ButtonStyle.Primary)
       .setEmoji("🎟️"),
     new ButtonBuilder()
-      .setCustomId("prize_jasa")
+      .setCustomId("price_jasa")
       .setLabel("Price Jasa")
       .setStyle(ButtonStyle.Success)
       .setEmoji("🏆"),
@@ -475,9 +471,9 @@ async function handleCloseTicket(interaction) {
 
   const reasonInput = new TextInputBuilder()
     .setCustomId("close_reason")
-    .setLabel("Resolution Notes")
+    .setLabel("Description (Ini Isi Ya Lana Ajg)")
     .setStyle(TextInputStyle.Paragraph)
-    .setPlaceholder("Describe how this ticket was resolved")
+    .setPlaceholder("Done/Cancel/More....")
     .setRequired(false)
     .setMaxLength(500);
 
@@ -531,7 +527,7 @@ async function archiveTicketHistory(
     // Buat embed utama (1 panel saja)
     const archiveEmbed = new EmbedBuilder()
       .setColor("#ff3333")
-      .setTitle(`📜 Ticket-${ticketData.subject} - Archive`)
+      .setTitle(`DOUGHLAS TICKET ARCHIVE`)
       .addFields(
         { name: "Client", value: `<@${ticketData.userId}>`, inline: true },
         {
@@ -550,7 +546,7 @@ async function archiveTicketHistory(
         { name: "Status", value: "Closed", inline: true },
         { name: "Closed at", value: new Date().toLocaleString(), inline: true },
         {
-          name: "Note",
+          name: "Description",
           value: closeReason || "No note provided",
           inline: false,
         },
@@ -606,7 +602,7 @@ async function handleCloseModalSubmit(interaction) {
     .setTitle("🔒 Ticket Closed")
     .setDescription(`This ticket has been closed by <@${interaction.user.id}>`)
     .addFields(
-      { name: "Resolution Notes", value: reason },
+      { name: "Description", value: reason },
       { name: "Closed at", value: new Date().toLocaleString() },
     )
     .setTimestamp();
@@ -638,7 +634,7 @@ async function handleCloseModalSubmit(interaction) {
             value: `<@${interaction.user.id}>`,
             inline: true,
           },
-          { name: "Resolution", value: reason },
+          { name: "Description", value: reason },
         )
         .setTimestamp();
       await logChannel.send({ embeds: [logEmbed] });
@@ -690,7 +686,7 @@ async function main() {
     console.log("  !addrole <@role> - Add a staff role for tickets");
     console.log("  !removerole <@role> - Remove a staff role");
     console.log("  !listroles - List all configured staff roles");
-    console.log("  !setprizejasa <channel_id> - Set PRIZE JASA info channel");
+    console.log("  !setpricejasa <channel_id> - Set PRICE JASA info channel");
     console.log("  !setpricelock <channel_id> - Set PRICE LOCK info channel");
   });
 
@@ -782,16 +778,16 @@ async function main() {
       return message.reply(`📋 **Configured Staff Roles:**\n${rolesList}`);
     }
 
-    if (message.content.startsWith("!setprizejasa ")) {
+    if (message.content.startsWith("!setpricejasa ")) {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
         return message.reply(
           "❌ You need Administrator permission to use this command.",
         );
       const channelId = message.content.split(" ")[1].replface(/[<#>]/g, "");
       const config = loadConfig();
-      config.prizeJasaChannelId = channelId;
+      config.priceJasaChannelId = channelId;
       saveConfig(config);
-      return message.reply(`✅ PRIZE JASA channel set to <#${channelId}>`);
+      return message.reply(`✅ PRICE JASA channel set to <#${channelId}>`);
     }
 
     if (message.content.startsWith("!setpricelock ")) {
@@ -825,19 +821,19 @@ async function main() {
         if (interaction.customId === "create_ticket") {
           return await handleCreateTicket(interaction);
         } else if (
-          interaction.customId === "prize_jasa" ||
+          interaction.customId === "price_jasa" ||
           interaction.customId === "price_jasa"
         ) {
           const config = loadConfig();
-          if (config.prizeJasaChannelId) {
+          if (config.priceJasaChannelId) {
             return interaction.reply({
-              content: `🏆 **PRICE JASA**\n\nFor service price information, please check: <#${config.prizeJasaChannelId}>`,
+              content: `🏆 **PRICE JASA**\n\nFor service price information, please check: <#${config.priceJasaChannelId}>`,
               ephemeral: true,
             });
           } else {
             return interaction.reply({
               content:
-                "🏆 **PRICE JASA**\n\nService price channel not configured yet.\nAsk an administrator to set it up with `!setprizejasa <channel_id>`",
+                "🏆 **PRICE JASA**\n\nService price channel not configured yet.\nAsk an administrator to set it up with `!setpricejasa <channel_id>`",
               ephemeral: true,
             });
           }
