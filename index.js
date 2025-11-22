@@ -783,7 +783,7 @@ async function main() {
         return message.reply(
           "❌ You need Administrator permission to use this command.",
         );
-      const channelId = message.content.split(" ")[1].replface(/[<#>]/g, "");
+      const channelId = message.content.split(" ")[1].replace(/[<#>]/g, "");
       const config = loadConfig();
       config.priceJasaChannelId = channelId;
       saveConfig(config);
