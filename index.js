@@ -227,7 +227,7 @@ async function handleTicketModalSubmit(interaction) {
 
   await interaction.reply({
     content:
-      "📋 **Almost done!** Please select which staff role should be notified about this ticket:",
+      "Please Select Roles Before You Create Ticket :D",
     components: [row],
     ephemeral: true,
   });
@@ -307,12 +307,12 @@ async function handleRoleSelect(interaction) {
 
   const ticketEmbed = new EmbedBuilder()
     .setColor("#00FF00")
-    .setTitle(`🎫 Ticket #${ticketCounter}`)
+    .setTitle(`DOUGHLAS TICKCET`)
     .setDescription(
       `**World Name:** ${ticketData.subject}\n**Service:** ${ticketData.description}\n**Amount:** ${ticketData.category}`,
     )
     .addFields(
-      { name: "Serc", value: description },
+      { name: "Service", value: description },
       { name: "Created by", value: `<@${interaction.user.id}>`, inline: true },
       { name: "Created at", value: new Date().toLocaleString(), inline: true },
     )
@@ -812,6 +812,40 @@ async function main() {
       config.archiveChannelId = channelId;
       saveConfig(config);
       return message.reply(`✅ Archive channel set to <#${channelId}>`);
+    }
+    
+    if (message.content.startsWith("!addchat ")) {
+  const config = loadConfig();
+
+  // Cek apakah member punya role admin
+  const isAdmin = (Array.isArray(config.adminRoles) ? config.adminRoles : []).some((roleId) =>
+    message.member.roles.cache.has(roleId)
+  );
+
+  if (!isAdmin)
+    return message.reply(
+      "❌ You don't have permission to use this command."
+    );
+
+  const text = message.content.slice("!addchat ".length).trim();
+  if (!text)
+    return message.reply(
+      "⚠️ Please provide the text.\nExample: `!addchat Hello everyone!`"
+    );
+
+  // Hapus pesan user
+  message.delete().catch(() => {});
+
+  // Embed keren
+  const embed = new EmbedBuilder()
+    .setColor("#00FFAA")
+    .setTitle("📢 Staff Announcement")
+    .setDescription(text)
+    .setFooter({ text: `Sent by ${message.author.username}` })
+    .setTimestamp();
+
+  // Kirim embed ke channel yang sama
+  return message.channel.send({ embeds: [embed] });
     }
   });
 
