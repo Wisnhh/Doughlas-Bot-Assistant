@@ -963,74 +963,70 @@ async function main() {
 
   client.on("guildMemberAdd", async (member) => {
   try {
-    const channelId = config.welcome.channelId;
-    if (!channelId) return;
+    const config = loadConfig(); // FIX WAJIB ADA
 
-    const channel = member.guild.channels.cache.get(channelId);
+    if (!config.welcomeChannel) return;
+
+    const channel = member.guild.channels.cache.get(config.welcomeChannel);
     if (!channel) return;
 
+    const guildName = member.guild.name;
+    const avatar = member.user.displayAvatarURL({ dynamic: true });
+
     const embed = new EmbedBuilder()
-      .setColor("#00ffe5") // Aqua line
-      .setAuthor({
-        name: `WELCOME ${member.user.username} IN ${member.guild.name}`,
-        iconURL: member.user.displayAvatarURL({ size: 1024 })
-      })
-      .setThumbnail(member.user.displayAvatarURL({ size: 1024 }))
+      .setColor("#00FFF0") // AQUA
       .setDescription(
+        `**WELCOME ${member} IN ${guildName}**\n\n` +
         `Take Role In Here <#961045481977417819>\n` +
         `Buy Jasa In Here <#1432736607169155072>\n` +
         `Testi In Here <#1433716636208070758>\n\n` +
         `**Thanks For Join In My Server**`
       )
-      .setTimestamp();
+      .setThumbnail(avatar)
+      .setFooter({ text: `Member Count: ${member.guild.memberCount}` });
 
     await channel.send({ embeds: [embed] });
-  } catch (error) {
-    console.error("WELCOME Error:", error);
+
+  } catch (err) {
+    console.error("WELCOME Error:", err);
   }
 });
 
   client.on("guildMemberRemove", async (member) => {
   try {
-    const channelId = config.goodbye.channelId;
-    if (!channelId) return;
+    const config = loadConfig(); // FIX WAJIB ADA
 
-    const channel = member.guild.channels.cache.get(channelId);
+    if (!config.goodbyeChannel) return;
+
+    const channel = member.guild.channels.cache.get(config.goodbyeChannel);
     if (!channel) return;
 
+    const avatar = member.user.displayAvatarURL({ dynamic: true });
+
     const embed = new EmbedBuilder()
-      .setColor("#ff0000") // Red line
-      .setAuthor({
-        name: `GOODBYE`,
-        iconURL: member.user.displayAvatarURL({ size: 1024 })
-      })
-      .setThumbnail(member.user.displayAvatarURL({ size: 1024 }))
+      .setColor("#FF0000") // MERAH
       .setDescription(
-        `Thanks For Join In **${member.guild.name}**\n` +
-        `If u Want To Join Back Here https://discord.gg/AF3REYDqps`
+        `**GOODBYE**\n\n` +
+        `Thanks For Join In **${member.guild.name}**\n\n` +
+        `If u Want To Join Back Here:\n` +
+        `https://discord.gg/AF3REYDqps`
       )
-      .setTimestamp();
+      .setThumbnail(avatar)
+      .setFooter({ text: `User Left` });
 
     await channel.send({ embeds: [embed] });
 
-    // ================= DM AUTOSEND =================
-    if (config.goodbye.dm === true) {
-      const dmEmbed = new EmbedBuilder()
-        .setColor("#ff0000")
-        .setAuthor({
-          name: `GOODBYE`,
-          iconURL: member.user.displayAvatarURL({ size: 1024 })
-        })
-        .setDescription(
-          `Thanks For Join In **${member.guild.name}**\n` +
-          `If u Want To Join Back Here: https://discord.gg/AF3REYDqps`
-        );
-
-      await member.send({ embeds: [dmEmbed] }).catch(() => {});
+    // OPTIONAL → KIRIM DM (tidak perlu config)
+    try {
+      await member.send(
+        `👋 **GOODBYE!**\nThanks for spending time in **${member.guild.name}**.\nIf you want to join again:\nhttps://discord.gg/AF3REYDqps`
+      );
+    } catch {
+      // user mungkin tutup DM
     }
 
-  } catch (error) {
-    console.error("GOODBYE Error:", error);
+  } catch (err) {
+    console.error("GOODBYE Error:", err);
   }
 });
 
