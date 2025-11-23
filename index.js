@@ -841,12 +841,12 @@ async function main() {
   const embed = new EmbedBuilder()
     .setColor("#1ABC9C")
     .setAuthor({
-      name: `**${guildName}**`,       // lebih tebal
+      name: `${guildName}`,       // lebih tebal
       iconURL: guildIcon
     })
     .setDescription(text)             // tanpa garis / dekorasi
     .setFooter({
-      text: `**${displayName}** • ${new Date().toLocaleString()}`,
+      text: `${displayName} • ${new Date().toLocaleString()}`,
     })
     .setTimestamp();
 
