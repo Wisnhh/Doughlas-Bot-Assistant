@@ -814,52 +814,46 @@ async function main() {
       return message.reply(`✅ Archive channel set to <#${channelId}>`);
     }
     
-// !addchat
-if (message.content.startsWith("!addchat ")) {
-    const config = loadConfig();
+    if (message.content.startsWith("!addchat ")) {
+  const config = loadConfig();
 
-    const isAdmin = (Array.isArray(config.adminRoles) ? config.adminRoles : []).some((roleId) =>
-        message.member.roles.cache.has(roleId)
-    );
+  const isAdmin = (Array.isArray(config.adminRoles) ? config.adminRoles : []).some((roleId) =>
+    message.member.roles.cache.has(roleId)
+  );
 
-    if (!isAdmin)
-        return message.reply("❌ You don't have permission to use this command.");
+  if (!isAdmin)
+    return message.reply("❌ You don't have permission to use this command.");
 
-    const text = message.content.slice("!addchat ".length).trim();
-    if (!text)
-        return message.reply("⚠️ Please provide the text.\nExample: `!addchat Hello everyone!`");
+  const text = message.content.slice("!addchat ".length).trim();
+  if (!text)
+    return message.reply("⚠️ Please provide the text.\nExample: `!addchat Hello everyone!`");
 
-    // hapus pesan user
-    message.delete().catch(() => {});
+  // hapus pesan user
+  message.delete().catch(() => {});
 
-    // Data otomatis server
-    const guildName = message.guild.name;
-    const guildIcon = message.guild.iconURL({ dynamic: true });
+  // Data otomatis server
+  const guildName = message.guild.name;
+  const guildIcon = message.guild.iconURL({ dynamic: true });
 
-    // username tanpa tag
-    const usernameOnly = message.author.username;
+  // Display name (nickname / username)
+  const displayName = message.member.displayName || message.author.username;
 
-    const embed = new EmbedBuilder()
-        .setColor("#1ABC9C")
-        .setAuthor({
-            name: guildName,
-            iconURL: guildIcon
-        })
-        .setDescription(`✦✦✦\n${text}\n✦✦✦`)
-        .setFooter({
-            text: `${usernameOnly} • ${new Date().toLocaleString()}`
-        })
-        .setTimestamp();
+  const embed = new EmbedBuilder()
+    .setColor("#1ABC9C")
+    .setAuthor({
+      name: `**${guildName}**`,       // lebih tebal
+      iconURL: guildIcon
+    })
+    .setDescription(text)             // tanpa garis / dekorasi
+    .setFooter({
+      text: `**${displayName}** • ${new Date().toLocaleString()}`,
+    })
+    .setTimestamp();
 
-    return message.channel.send({ embeds: [embed] });
+  return message.channel.send({ embeds: [embed] });
 }
 
-
-
-// =====================================================================
-// !copy MESSAGE ID — ambil teks original TANPA embed
-// =====================================================================
-if (message.content.startsWith("!copy ")) {
+    if (message.content.startsWith("!copy ")) {
     const args = message.content.split(" ");
     const messageID = args[1];
 
