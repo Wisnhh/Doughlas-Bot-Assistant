@@ -906,9 +906,9 @@ if (message.content.startsWith("!editchat ")) {
         const editedEmbed = new EmbedBuilder()
             .setColor("#1ABC9C")
             .setAuthor({ name: guildName, iconURL: guildIcon })
-            .setDescription(`✦✦✦\n${newText}\n✦✦✦`)
+            .setDescription(`${newText}`)
             .setFooter({
-                text: `${usernameOnly} • ${new Date().toLocaleString()}`
+                text: `${displayName} • ${new Date().toLocaleString()}`
             })
             .setTimestamp();
 
@@ -917,7 +917,7 @@ if (message.content.startsWith("!editchat ")) {
         return message.reply("✅ Pesan berhasil diperbarui.");
 
     } catch (err) {
-        return message.reply("❌ Tidak dapat mengedit pesan. Pastikan ID benar.");
+        return message.reply("Tidak dapat mengedit pesan. Pastikan ID benar.");
     }
   }
   });
