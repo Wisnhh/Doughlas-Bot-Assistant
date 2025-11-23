@@ -880,12 +880,7 @@ async function main() {
     }
 }
 
-
-
-// =====================================================================
-// !editchat MESSAGE ID TEXT — update embed lama menjadi embed baru
-// =====================================================================
-if (message.content.startsWith("!editchat ")) {
+    if (message.content.startsWith("!editchat ")) {
     const args = message.content.split(" ");
     const messageID = args[1];
     const newText = message.content.slice(`!editchat ${messageID} `.length).trim();
@@ -920,7 +915,124 @@ if (message.content.startsWith("!editchat ")) {
         return message.reply("Tidak dapat mengedit pesan. Pastikan ID benar.");
     }
   }
+
+    if (message.content.startsWith("!setwelcome ")) {
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+    return message.reply("❌ You need Administrator permission to use this command.");
+
+  const args = message.content.split(" ");
+  const channelId = args[1]?.replace(/[<#>]/g, "");
+  const background = args[2] || null;
+
+  if (!channelId)
+    return message.reply("⚠️ Use: **!setwelcome #channel <background_url_optional>**");
+
+  const config = loadConfig();
+  config.welcomeChannel = channelId;
+  config.welcomeBackground = background;
+  saveConfig(config);
+
+  return message.reply(
+    `✅ Welcome channel set to <#${channelId}>\n` +
+    `🖼 Background: ${background ? background : "_No background set_"}`
+  );
+}
+
+    if (message.content.startsWith("!setgoodbye ")) {
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+    return message.reply("❌ You need Administrator permission to use this command.");
+
+  const args = message.content.split(" ");
+  const channelId = args[1]?.replace(/[<#>]/g, "");
+  const background = args[2] || null;
+
+  if (!channelId)
+    return message.reply("⚠️ Use: **!setgoodbye #channel <background_url_optional>**");
+
+  const config = loadConfig();
+  config.goodbyeChannel = channelId;
+  config.goodbyeBackground = background;
+  saveConfig(config);
+
+  return message.reply(
+    `✅ Goodbye channel set to <#${channelId}>\n` +
+    `🖼 Background: ${background ? background : "_No background set_"}`
+  );
+  }
   });
+
+  client.on("guildMemberAdd", async (member) => {
+  try {
+    const channelId = config.welcome.channelId;
+    if (!channelId) return;
+
+    const channel = member.guild.channels.cache.get(channelId);
+    if (!channel) return;
+
+    const embed = new EmbedBuilder()
+      .setColor("#00ffe5") // Aqua line
+      .setAuthor({
+        name: `WELCOME ${member.user.username} IN ${member.guild.name}`,
+        iconURL: member.user.displayAvatarURL({ size: 1024 })
+      })
+      .setThumbnail(member.user.displayAvatarURL({ size: 1024 }))
+      .setDescription(
+        `Take Role In Here <#961045481977417819>\n` +
+        `Buy Jasa In Here <#1432736607169155072>\n` +
+        `Testi In Here <#1433716636208070758>\n\n` +
+        `**Thanks For Join In My Server**`
+      )
+      .setTimestamp();
+
+    await channel.send({ embeds: [embed] });
+  } catch (error) {
+    console.error("WELCOME Error:", error);
+  }
+});
+
+  client.on("guildMemberRemove", async (member) => {
+  try {
+    const channelId = config.goodbye.channelId;
+    if (!channelId) return;
+
+    const channel = member.guild.channels.cache.get(channelId);
+    if (!channel) return;
+
+    const embed = new EmbedBuilder()
+      .setColor("#ff0000") // Red line
+      .setAuthor({
+        name: `GOODBYE`,
+        iconURL: member.user.displayAvatarURL({ size: 1024 })
+      })
+      .setThumbnail(member.user.displayAvatarURL({ size: 1024 }))
+      .setDescription(
+        `Thanks For Join In **${member.guild.name}**\n` +
+        `If u Want To Join Back Here https://discord.gg/AF3REYDqps`
+      )
+      .setTimestamp();
+
+    await channel.send({ embeds: [embed] });
+
+    // ================= DM AUTOSEND =================
+    if (config.goodbye.dm === true) {
+      const dmEmbed = new EmbedBuilder()
+        .setColor("#ff0000")
+        .setAuthor({
+          name: `GOODBYE`,
+          iconURL: member.user.displayAvatarURL({ size: 1024 })
+        })
+        .setDescription(
+          `Thanks For Join In **${member.guild.name}**\n` +
+          `If u Want To Join Back Here: https://discord.gg/AF3REYDqps`
+        );
+
+      await member.send({ embeds: [dmEmbed] }).catch(() => {});
+    }
+
+  } catch (error) {
+    console.error("GOODBYE Error:", error);
+  }
+});
 
   client.on("interactionCreate", async (interaction) => {
     try {
