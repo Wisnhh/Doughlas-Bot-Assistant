@@ -994,7 +994,7 @@ async function main() {
 
   client.on("guildMemberRemove", async (member) => {
   try {
-    const config = loadConfig(); // FIX WAJIB ADA
+    const config = loadConfig(); 
 
     if (!config.goodbyeChannel) return;
 
@@ -1004,25 +1004,21 @@ async function main() {
     const avatar = member.user.displayAvatarURL({ dynamic: true });
 
     const embed = new EmbedBuilder()
-      .setColor("#FF0000") // MERAH
+      .setColor("#FF0000") 
       .setDescription(
         `**GOODBYE**\n\n` +
         `Thanks For Join In **${member.guild.name}**\n\n` +
-        `If u Want To Join Back Here:\n` +
-        `https://discord.gg/AF3REYDqps`
+        `Semoga Hidupmu Suram`
       )
       .setThumbnail(avatar)
       .setFooter({ text: `User Left` });
 
     await channel.send({ embeds: [embed] });
-
-    // OPTIONAL → KIRIM DM (tidak perlu config)
     try {
       await member.send(
         `👋 **GOODBYE!**\nThanks for spending time in **${member.guild.name}**.\nIf you want to join again:\nhttps://discord.gg/AF3REYDqps`
       );
     } catch {
-      // user mungkin tutup DM
     }
 
   } catch (err) {
