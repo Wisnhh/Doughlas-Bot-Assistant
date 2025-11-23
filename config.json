@@ -7,8 +7,9 @@
   "staffRoles": ["1433507603123540008"],
   "adminRoles": ["1432735629543735368"],
   "archiveChannelId": "1437578501778702417",
+  
   "welcomeChannel": "1442202358099476480",           
-  "welcomeBackground": null,
+  "welcomeBackground": "https://i.pinimg.com/736x/c5/5a/db/c55adb972b5396c6f1fc2a13e3a05241.jpg",
   "goodbyeChannel": "1442202440739848255",           
-  "goodbyeBackground": null
+  "goodbyeBackground": "https://i.pinimg.com/736x/c5/5a/db/c55adb972b5396c6f1fc2a13e3a05241.jpg"
 }
