@@ -814,39 +814,118 @@ async function main() {
       return message.reply(`✅ Archive channel set to <#${channelId}>`);
     }
     
-    if (message.content.startsWith("!addchat ")) {
-  const config = loadConfig();
+// !addchat
+if (message.content.startsWith("!addchat ")) {
+    const config = loadConfig();
 
-  // Cek apakah member punya role admin
-  const isAdmin = (Array.isArray(config.adminRoles) ? config.adminRoles : []).some((roleId) =>
-    message.member.roles.cache.has(roleId)
-  );
-
-  if (!isAdmin)
-    return message.reply(
-      "❌ You don't have permission to use this command."
+    const isAdmin = (Array.isArray(config.adminRoles) ? config.adminRoles : []).some((roleId) =>
+        message.member.roles.cache.has(roleId)
     );
 
-  const text = message.content.slice("!addchat ".length).trim();
-  if (!text)
-    return message.reply(
-      "⚠️ Please provide the text.\nExample: `!addchat Hello everyone!`"
-    );
+    if (!isAdmin)
+        return message.reply("❌ You don't have permission to use this command.");
 
-  // Hapus pesan user
-  message.delete().catch(() => {});
+    const text = message.content.slice("!addchat ".length).trim();
+    if (!text)
+        return message.reply("⚠️ Please provide the text.\nExample: `!addchat Hello everyone!`");
 
-  // Embed keren
-  const embed = new EmbedBuilder()
-    .setColor("#00FFAA")
-    .setTitle("📢 Staff Announcement")
-    .setDescription(text)
-    .setFooter({ text: `Sent by ${message.author.username}` })
-    .setTimestamp();
+    // hapus pesan user
+    message.delete().catch(() => {});
 
-  // Kirim embed ke channel yang sama
-  return message.channel.send({ embeds: [embed] });
+    // Data otomatis server
+    const guildName = message.guild.name;
+    const guildIcon = message.guild.iconURL({ dynamic: true });
+
+    // username tanpa tag
+    const usernameOnly = message.author.username;
+
+    const embed = new EmbedBuilder()
+        .setColor("#1ABC9C")
+        .setAuthor({
+            name: guildName,
+            iconURL: guildIcon
+        })
+        .setDescription(`✦✦✦\n${text}\n✦✦✦`)
+        .setFooter({
+            text: `${usernameOnly} • ${new Date().toLocaleString()}`
+        })
+        .setTimestamp();
+
+    return message.channel.send({ embeds: [embed] });
+}
+
+
+
+// =====================================================================
+// !copy MESSAGE ID — ambil teks original TANPA embed
+// =====================================================================
+if (message.content.startsWith("!copy ")) {
+    const args = message.content.split(" ");
+    const messageID = args[1];
+
+    if (!messageID) return message.reply("⚠️ Harap masukkan message ID.");
+
+    try {
+        const targetMsg = await message.channel.messages.fetch(messageID);
+
+        let content = targetMsg.content;
+
+        // Jika pesan berupa embed → ambil description
+        if (!content && targetMsg.embeds.length > 0) {
+            const embed = targetMsg.embeds[0];
+            content = embed.description || "(embed tidak punya text)";
+        }
+
+        if (!content) return message.reply("❌ Pesan tidak berisi teks.");
+
+        // Kirim ulang teks saja tanpa embed
+        return message.channel.send(content);
+
+    } catch {
+        return message.reply("❌ Message ID tidak ditemukan di channel ini.");
     }
+}
+
+
+
+// =====================================================================
+// !editchat MESSAGE ID TEXT — update embed lama menjadi embed baru
+// =====================================================================
+if (message.content.startsWith("!editchat ")) {
+    const args = message.content.split(" ");
+    const messageID = args[1];
+    const newText = message.content.slice(`!editchat ${messageID} `.length).trim();
+
+    if (!messageID) return message.reply("⚠️ Harap masukkan message ID.");
+    if (!newText) return message.reply("⚠️ Harap masukkan teks baru.");
+
+    try {
+        const msg = await message.channel.messages.fetch(messageID);
+
+        if (msg.author.id !== client.user.id)
+            return message.reply("❌ Bot hanya bisa mengedit pesan miliknya sendiri.");
+
+        const guildName = message.guild.name;
+        const guildIcon = message.guild.iconURL({ dynamic: true });
+        const usernameOnly = message.author.username;
+
+        const editedEmbed = new EmbedBuilder()
+            .setColor("#1ABC9C")
+            .setAuthor({ name: guildName, iconURL: guildIcon })
+            .setDescription(`✦✦✦\n${newText}\n✦✦✦`)
+            .setFooter({
+                text: `${usernameOnly} • ${new Date().toLocaleString()}`
+            })
+            .setTimestamp();
+
+        await msg.edit({ embeds: [editedEmbed] });
+
+        return message.reply("✅ Pesan berhasil diperbarui.");
+
+    } catch (err) {
+        return message.reply("❌ Tidak dapat mengedit pesan. Pastikan ID benar.");
+    }
+  }
   });
 
   client.on("interactionCreate", async (interaction) => {
