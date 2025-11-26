@@ -471,8 +471,8 @@ async function handleCloseTicket(interaction) {
 
   const reasonInput = new TextInputBuilder()
     .setCustomId("close_reason")
-    .setLabel("Description (Ini Isi Ya Lana Ajg)")
-    .setStyle(TextInputStyle.Paragraph)
+    .setLabel("Description")
+    .setStyle(TextInputStyle.Short)
     .setPlaceholder("Done/Cancel/More....")
     .setRequired(false)
     .setMaxLength(500);
