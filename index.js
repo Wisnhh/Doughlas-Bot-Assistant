@@ -638,7 +638,7 @@ saveTickets(tickets);
     .setDescription(`This ticket has been closed by <@${interaction.user.id}>`)
     .addFields(
       { name: "Description", value: reason },
-      { name: "Total Price", value: `${ticketData.totalPrice} <:wl:1435565382164545576>`, inline: true },
+      { name: "Total Price", value: `${ticketData.totalPrice} <:dl:1435564709913956373>`, inline: true },
       { name: "Tax", value: `${ticketData.tax} <:wl:1435565382164545576>`, inline: true },
       { name: "Closed at", value: new Date().toLocaleString() },
     )
@@ -659,7 +659,7 @@ saveTickets(tickets);
           { name: "Ticket", value: `#${ticketData.ticketNumber}`, inline: true },
           { name: "Channel", value: `<#${interaction.channel.id}>`, inline: true },
           { name: "Closed by", value: `<@${interaction.user.id}>`, inline: true },
-          { name: "Total Price", value: `${priceValue} <:wl:1435565382164545576>` },
+          { name: "Total Price", value: `${priceValue} <:dl:1435564709913956373>` },
           { name: "Tax", value: `${tax} <:wl:1435565382164545576>` },
           { name: "Description", value: reason },
         )
