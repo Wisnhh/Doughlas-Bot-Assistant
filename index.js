@@ -466,18 +466,26 @@ async function handleCloseTicket(interaction) {
   }
 
   const modal = new ModalBuilder()
-    .setCustomId("close_modal")
-    .setTitle("Close Ticket");
+  .setCustomId("close_modal")
+  .setTitle("Close Ticket");
 
-  const reasonInput = new TextInputBuilder()
-    .setCustomId("close_reason")
-    .setLabel("Description")
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Done/Cancel/More....")
-    .setRequired(false)
-    .setMaxLength(500);
+const reasonInput = new TextInputBuilder()
+  .setCustomId("close_reason")
+  .setLabel("Description")
+  .setStyle(TextInputStyle.Short)
+  .setPlaceholder("Done/Cancel/More....")
+  .setRequired(true);
 
-  modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
+const priceInput = new TextInputBuilder()
+  .setCustomId("close_total_price")
+  .setLabel("Total Price")
+  .setStyle(TextInputStyle.Short)
+  .setPlaceholder("Total Price")
+  .setRequired(true);
+
+modal.addComponents(
+  new ActionRowBuilder().addComponents(reasonInput),
+  new ActionRowBuilder().addComponents(priceInput));
   await interaction.showModal(modal);
 }
 
@@ -545,6 +553,9 @@ async function archiveTicketHistory(
         { name: "Amount", value: ticketData.category || "0", inline: true },
         { name: "Status", value: "Closed", inline: true },
         { name: "Closed at", value: new Date().toLocaleString(), inline: true },
+        { name: "Total Price", value: `${ticketData.totalPrice || 0} :dl:`, inline: true },
+        { name: "Tax", value: `${ticketData.tax || 0} :dl:`, inline: true },
+        
         {
           name: "Description",
           value: closeReason || "No note provided",
@@ -583,6 +594,21 @@ async function handleCloseModalSubmit(interaction) {
   const reason =
     interaction.fields.getTextInputValue("close_reason") ||
     "No reason provided";
+
+  const totalPrice = interaction.fields.getTextInputValue("close_total_price");
+const priceValue = parseFloat(totalPrice);
+
+if (isNaN(priceValue)) {
+  return interaction.editReply("❌ Total Price harus berupa angka.");
+}
+
+// Hitung tax 5%
+const tax = Math.floor(priceValue * 0.05);
+
+// Simpan data
+ticketData.totalPrice = priceValue;
+ticketData.tax = tax;
+
   const ticketData = tickets[interaction.channel.id];
 
   if (!ticketData) {
@@ -624,6 +650,11 @@ async function handleCloseModalSubmit(interaction) {
             value: `#${ticketData.ticketNumber}`,
             inline: true,
           },
+          { name: "Total Price",
+            value: `${ticketData.totalPrice} :dl:` },
+          { name: "Tax",
+            value: `${ticketData.tax} :dl:` },
+
           {
             name: "Channel",
             value: `<#${interaction.channel.id}>`,
