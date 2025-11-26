@@ -553,8 +553,8 @@ async function archiveTicketHistory(
         { name: "Amount", value: ticketData.category || "0", inline: true },
         { name: "Status", value: "Closed", inline: true },
         { name: "Closed at", value: new Date().toLocaleString(), inline: true },
-        { name: "Total Price", value: `${ticketData.totalPrice || 0} :dl:`, inline: true },
-        { name: "Tax", value: `${ticketData.tax || 0} :dl: :wl:`, inline: true },
+        { name: "Total Price", value: `${ticketData.totalPrice || 0} <:dl:1443250020374679654>`, inline: true },
+        { name: "Tax", value: `${ticketData.tax || 0} <:dl:1443250020374679654>/<:wl:1443250031342911640>`, inline: true },
         
         {
           name: "Description",
