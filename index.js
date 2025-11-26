@@ -480,7 +480,7 @@ const priceInput = new TextInputBuilder()
   .setCustomId("close_total_price")
   .setLabel("Total Price")
   .setStyle(TextInputStyle.Short)
-  .setPlaceholder("Total Price")
+  .setPlaceholder("write in the amount of wl/tulis pakai format wl")
   .setRequired(true);
 
 modal.addComponents(
@@ -553,8 +553,8 @@ async function archiveTicketHistory(
         { name: "Amount", value: ticketData.category || "0", inline: true },
         { name: "Status", value: "Closed", inline: true },
         { name: "Closed at", value: new Date().toLocaleString(), inline: true },
-        { name: "Total Price", value: `${ticketData.totalPrice || 0} <:dl:1443250020374679654>`, inline: true },
-        { name: "Tax", value: `${ticketData.tax || 0} <:dl:1443250020374679654>/<:wl:1443250031342911640>`, inline: true },
+        { name: "Total Price", value: `${ticketData.totalPrice || 0} <:dl:1435564709913956373>`, inline: true },
+        { name: "Tax", value: `${ticketData.tax || 0} <:wl:1435565382164545576>`, inline: true },
         
         {
           name: "Description",
@@ -635,8 +635,8 @@ async function handleCloseModalSubmit(interaction) {
     .setDescription(`This ticket has been closed by <@${interaction.user.id}>`)
     .addFields(
       { name: "Description", value: reason },
-      { name: "Total Price", value: `${priceValue} :dl:` },
-      { name: "Tax", value: `${tax} :dl: :wl:` },
+      { name: "Total Price", value: `${priceValue} <:dl:1435564709913956373>` },
+      { name: "Tax", value: `${tax} <:wl:1435565382164545576>` },
       { name: "Closed at", value: new Date().toLocaleString() },
     )
     .setTimestamp();
