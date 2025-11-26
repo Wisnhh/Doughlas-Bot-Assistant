@@ -554,7 +554,7 @@ async function archiveTicketHistory(
         { name: "Status", value: "Closed", inline: true },
         { name: "Closed at", value: new Date().toLocaleString(), inline: true },
         { name: "Total Price", value: `${ticketData.totalPrice || 0} :dl:`, inline: true },
-        { name: "Tax", value: `${ticketData.tax || 0} :dl:`, inline: true },
+        { name: "Tax", value: `${ticketData.tax || 0} :dl: :wl:`, inline: true },
         
         {
           name: "Description",
@@ -595,20 +595,22 @@ async function handleCloseModalSubmit(interaction) {
     interaction.fields.getTextInputValue("close_reason") ||
     "No reason provided";
 
+  // -----------------------------
+  // 🔥 Ambil Total Price (WAJIB)
+  // -----------------------------
   const totalPrice = interaction.fields.getTextInputValue("close_total_price");
-const priceValue = parseFloat(totalPrice);
+  const priceValue = parseFloat(totalPrice);
 
-if (isNaN(priceValue)) {
-  return interaction.editReply("❌ Total Price harus berupa angka.");
-}
+  if (isNaN(priceValue)) {
+    return interaction.editReply("❌ Total Price harus berupa angka.");
+  }
 
-// Hitung tax 5%
-const tax = Math.floor(priceValue * 0.05);
+  // Tax 5%
+  const tax = Math.floor(priceValue * 0.05);
 
-// Simpan data
-ticketData.totalPrice = priceValue;
-ticketData.tax = tax;
-
+  // -----------------------------
+  // Ambil ticketData SETELAH nya!
+  // -----------------------------
   const ticketData = tickets[interaction.channel.id];
 
   if (!ticketData) {
@@ -616,6 +618,10 @@ ticketData.tax = tax;
       content: "❌ This is not a valid ticket channel.",
     });
   }
+
+  // Simpan data
+  ticketData.totalPrice = priceValue;
+  ticketData.tax = tax;
 
   ticketData.status = "closed";
   ticketData.closedBy = interaction.user.id;
@@ -629,6 +635,8 @@ ticketData.tax = tax;
     .setDescription(`This ticket has been closed by <@${interaction.user.id}>`)
     .addFields(
       { name: "Description", value: reason },
+      { name: "Total Price", value: `${priceValue} :dl:` },
+      { name: "Tax", value: `${tax} :dl: :wl:` },
       { name: "Closed at", value: new Date().toLocaleString() },
     )
     .setTimestamp();
@@ -645,26 +653,11 @@ ticketData.tax = tax;
         .setColor("#FF0000")
         .setTitle("🔒 Ticket Closed")
         .addFields(
-          {
-            name: "Ticket",
-            value: `#${ticketData.ticketNumber}`,
-            inline: true,
-          },
-          { name: "Total Price",
-            value: `${ticketData.totalPrice} :dl:` },
-          { name: "Tax",
-            value: `${ticketData.tax} :dl:` },
-
-          {
-            name: "Channel",
-            value: `<#${interaction.channel.id}>`,
-            inline: true,
-          },
-          {
-            name: "Closed by",
-            value: `<@${interaction.user.id}>`,
-            inline: true,
-          },
+          { name: "Ticket", value: `#${ticketData.ticketNumber}`, inline: true },
+          { name: "Channel", value: `<#${interaction.channel.id}>`, inline: true },
+          { name: "Closed by", value: `<@${interaction.user.id}>`, inline: true },
+          { name: "Total Price", value: `${priceValue} :dl:` },
+          { name: "Tax", value: `${tax} :dl:` },
           { name: "Description", value: reason },
         )
         .setTimestamp();
@@ -695,8 +688,9 @@ ticketData.tax = tax;
     } catch (error) {
       console.error("Error deleting channel:", error);
     }
-  }, 10000);
+  }, 5000);
 }
+
 
 /* ---------- Main / Events ---------- */
 
