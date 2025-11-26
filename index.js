@@ -592,12 +592,10 @@ async function handleCloseModalSubmit(interaction) {
   await interaction.deferReply();
 
   const reason =
-    interaction.fields.getTextInputValue("close_reason") ||
-    "No reason provided";
+  interaction.fields.getTextInputValue("close_reason") ||
+  "No reason provided";
 
-  // -----------------------------
-  // 🔥 Ambil Total Price (WAJIB)
-  // -----------------------------
+// Ambil Total Price dari modal
 const totalPrice = interaction.fields.getTextInputValue("close_total_price");
 
 // Validasi angka
@@ -607,33 +605,32 @@ if (!/^[0-9]+$/.test(totalPrice)) {
 
 const priceValue = parseInt(totalPrice);
 
-// 👉 Convert khusus Total Price
+// Convert khusus total price → DL (WL/100)
 const convertedTotalPrice = priceValue / 100;
 
-// 👉 Tax 5% dari input asli (Bukan yang sudah di convert)
+// Tax tetap 5% dari angka asli
 const tax = Math.floor(priceValue * 0.05);
 
-// Simpan ke ticket data
-ticketData.totalPrice = convertedTotalPrice;  // hasil sudah dikonversi
+// ------------------------------------
+// 🔥 BARU AMBIL ticketData DI SINI !!
+// ------------------------------------
+const ticketData = tickets[interaction.channel.id];
+
+if (!ticketData) {
+  return await interaction.editReply({
+    content: "❌ This is not a valid ticket channel.",
+  });
+}
+
+// Simpan data final
+ticketData.totalPrice = convertedTotalPrice;   // hasil convert
 ticketData.tax = tax;
+ticketData.status = "closed";
+ticketData.closedBy = interaction.user.id;
+ticketData.closedAt = new Date().toISOString();
+ticketData.closeReason = reason;
 
-  const ticketData = tickets[interaction.channel.id];
-
-  if (!ticketData) {
-    return await interaction.editReply({
-      content: "❌ This is not a valid ticket channel.",
-    });
-  }
-
-  // Simpan data
-  ticketData.totalPrice = priceValue;
-  ticketData.tax = tax;
-
-  ticketData.status = "closed";
-  ticketData.closedBy = interaction.user.id;
-  ticketData.closedAt = new Date().toISOString();
-  ticketData.closeReason = reason;
-  saveTickets(tickets);
+saveTickets(tickets);
 
   const closeEmbed = new EmbedBuilder()
     .setColor("#FF0000")
