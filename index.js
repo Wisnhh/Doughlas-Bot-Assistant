@@ -598,19 +598,25 @@ async function handleCloseModalSubmit(interaction) {
   // -----------------------------
   // 🔥 Ambil Total Price (WAJIB)
   // -----------------------------
-  const totalPrice = interaction.fields.getTextInputValue("close_total_price");
-  const priceValue = parseFloat(totalPrice);
+const totalPrice = interaction.fields.getTextInputValue("close_total_price");
 
-  if (isNaN(priceValue)) {
-    return interaction.editReply("❌ Total Price harus berupa angka.");
-  }
+// Validasi angka
+if (!/^[0-9]+$/.test(totalPrice)) {
+  return interaction.editReply("❌ Total Price hanya boleh diisi angka.");
+}
 
-  // Tax 5%
-  const tax = Math.floor(priceValue * 0.05);
+const priceValue = parseInt(totalPrice);
 
-  // -----------------------------
-  // Ambil ticketData SETELAH nya!
-  // -----------------------------
+// 👉 Convert khusus Total Price
+const convertedTotalPrice = priceValue / 100;
+
+// 👉 Tax 5% dari input asli (Bukan yang sudah di convert)
+const tax = Math.floor(priceValue * 0.05);
+
+// Simpan ke ticket data
+ticketData.totalPrice = convertedTotalPrice;  // hasil sudah dikonversi
+ticketData.tax = tax;
+
   const ticketData = tickets[interaction.channel.id];
 
   if (!ticketData) {
@@ -635,8 +641,8 @@ async function handleCloseModalSubmit(interaction) {
     .setDescription(`This ticket has been closed by <@${interaction.user.id}>`)
     .addFields(
       { name: "Description", value: reason },
-      { name: "Total Price", value: `${priceValue} <:dl:1435564709913956373>` },
-      { name: "Tax", value: `${tax} <:wl:1435565382164545576>` },
+      { name: "Total Price", value: `${ticketData.totalPrice} <:wl:1435565382164545576>`, inline: true },
+      { name: "Tax", value: `${ticketData.tax} <:wl:1435565382164545576>`, inline: true },
       { name: "Closed at", value: new Date().toLocaleString() },
     )
     .setTimestamp();
@@ -656,8 +662,8 @@ async function handleCloseModalSubmit(interaction) {
           { name: "Ticket", value: `#${ticketData.ticketNumber}`, inline: true },
           { name: "Channel", value: `<#${interaction.channel.id}>`, inline: true },
           { name: "Closed by", value: `<@${interaction.user.id}>`, inline: true },
-          { name: "Total Price", value: `${priceValue} :dl:` },
-          { name: "Tax", value: `${tax} :dl:` },
+          { name: "Total Price", value: `${priceValue} <:wl:1435565382164545576>` },
+          { name: "Tax", value: `${tax} <:wl:1435565382164545576>` },
           { name: "Description", value: reason },
         )
         .setTimestamp();
