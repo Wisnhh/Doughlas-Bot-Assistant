@@ -194,6 +194,7 @@ async function handleCreateTicket(interaction) {
     new ActionRowBuilder().addComponents(subjectInput),
     new ActionRowBuilder().addComponents(descriptionInput),
     new ActionRowBuilder().addComponents(categoryInput),
+    new ActionRowBuilder().addComponents(uwsInput),
   );
 
   await interaction.showModal(modal);
@@ -316,7 +317,7 @@ async function handleRoleSelect(interaction) {
     .setColor("#00FF00")
     .setTitle(`DOUGHLAS TICKCET`)
     .setDescription(
-      `**World Name:** ${ticketData.subject}\n**Service:** ${ticketData.description}\n**Amount:** ${ticketData.category}`,
+      `**World Name:** ${ticketData.subject}\n**Service:** ${ticketData.description}\n**AMMOUNT:** ${ticketData.category}\n**UWS:** ${uws || "-"}`,
     )
     .addFields(
       { name: "Service", value: description },
