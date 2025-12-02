@@ -176,11 +176,19 @@ async function handleCreateTicket(interaction) {
 
   const categoryInput = new TextInputBuilder()
     .setCustomId("ticket_category")
-    .setLabel("AMOUNT")
+    .setLabel("AMMOUNT")
     .setStyle(TextInputStyle.Short)
     .setPlaceholder("Enter The Amount You want To Buy")
     .setRequired(true)
     .setMaxLength(1000);
+
+  const uwsInput = new TextInputBuilder()
+    .setCustomId("ticket_uws")
+    .setLabel("UWS")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Uws Buyyer Or Uws Seller (leave blank if you don't buy ptht services)")
+    .setRequired(false)
+    .setMaxLength(100);
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(subjectInput),
@@ -198,6 +206,7 @@ async function handleTicketModalSubmit(interaction) {
     interaction.fields.getTextInputValue("ticket_description");
   const subject = interaction.fields.getTextInputValue("ticket_subject");
   const category = interaction.fields.getTextInputValue("ticket_category");
+  const uws = interaction.fields.getTextInputValue("ticket_uws");
 
   const config = loadConfig();
   const guild = interaction.guild;
@@ -223,7 +232,7 @@ async function handleTicketModalSubmit(interaction) {
 
   const row = new ActionRowBuilder().addComponents(selectMenu);
 
-  pendingTickets.set(interaction.user.id, { subject, description, category });
+  pendingTickets.set(interaction.user.id, { subject, description, category, uws });
 
   await interaction.reply({
     content:
@@ -248,7 +257,7 @@ async function handleRoleSelect(interaction) {
     components: [],
   });
 
-  const { subject, description, category } = ticketData;
+  const { subject, description, category, uws } = ticketData;
   const selectedRoleId = interaction.values[0];
 
   ticketCounter++;
@@ -263,13 +272,11 @@ async function handleRoleSelect(interaction) {
 
   // build sanitized channel name: ticket-<service>-<player>
   const serviceName = sanitizeChannelName(description, "service");
-  // prefer nick if available
-  let playerName = interaction.member?.nickname || interaction.user.username;
+  let playerName = interaction.member?.displayName || interaction.user.username; 
   playerName = sanitizeChannelName(playerName, "player");
 
   const channelName = `ticket-${serviceName}-${playerName}`;
 
-  // create channel
   const permissionOverwrites = [
     { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
     {
@@ -354,8 +361,9 @@ async function handleRoleSelect(interaction) {
     channelId: ticketChannel.id,
     userId: interaction.user.id,
     subject,
-    description, // store service text so rename works reliably
+    description, 
     category,
+    uws,
     status: "open",
     createdAt: new Date().toISOString(),
     claimedBy: null,
@@ -374,7 +382,8 @@ async function handleRoleSelect(interaction) {
           { name: "User", value: `<@${interaction.user.id}>`, inline: true },
           { name: "Subject", value: subject },
           { name: "Service", value: description, inline: true },
-          { name: "Amount", value: category, inline: true },
+          { name: "Ammount", value: category, inline: true },
+          { name: "UWS", value: uws || "None", inline: true },
         )
         .setTimestamp();
       await logChannel.send({ embeds: [logEmbed] });
@@ -424,16 +433,13 @@ async function handleClaimTicket(interaction) {
     const serviceName = sanitizeChannelName(
       ticketData.description || "service",
     );
-    const staffName =
-      interaction.member?.nickname ||
-      interaction.user.username ||
-      `staff${interaction.user.id}`;
+const staffName =
+      interaction.member?.displayName || `staff${interaction.user.id}`;
+      
     const staffSan = sanitizeChannelName(staffName, "staff");
-    const newName = `ticket-${serviceName}-${staffSan}`;
+    const newName = `Service-${serviceName}-By-${staffSan}`;
 
     await interaction.channel.setName(newName).catch((err) => {
-      // ignore rename error but log
-      console.error("Failed to rename ticket channel on claim:", err);
     });
   } catch (err) {
     console.error("Error while renaming channel on claim:", err);
@@ -489,8 +495,6 @@ modal.addComponents(
   await interaction.showModal(modal);
 }
 
-/* ---------- Archive / Close Modal Submit ---------- */
-
 async function archiveTicketHistory(
   channel,
   ticketData,
@@ -501,8 +505,6 @@ async function archiveTicketHistory(
   try {
     const messages = [];
     let lastMessageId;
-
-    // Ambil semua pesan dalam tiket
     while (true) {
       const options = { limit: 100 };
       if (lastMessageId) options.before = lastMessageId;
@@ -515,24 +517,19 @@ async function archiveTicketHistory(
 
     messages.reverse();
 
-    // Buat Chat History
     let chatHistory = "";
     for (const msg of messages) {
-      // Lewatkan pesan sistem bot
       if (msg.author.bot && !msg.webhookId) continue;
 
       const timestamp = msg.createdAt.toLocaleString();
       const author = msg.author.username;
       const content = msg.content || "";
-
+      
       if (!content.trim()) continue;
-
       chatHistory += `[${timestamp}] ${author}: ${content}\n`;
     }
 
     if (chatHistory.length === 0) chatHistory = "_No chat history available._";
-
-    // Buat embed utama (1 panel saja)
     const archiveEmbed = new EmbedBuilder()
       .setColor("#ff3333")
       .setTitle(`DOUGHLAS TICKET ARCHIVE`)
@@ -551,6 +548,7 @@ async function archiveTicketHistory(
 
         { name: "Service", value: ticketData.description || "-", inline: true },
         { name: "Amount", value: ticketData.category || "0", inline: true },
+        { name: "Uws", value: ticketData.uws || "-", inline: true },
         { name: "Status", value: "Closed", inline: true },
         { name: "Closed at", value: new Date().toLocaleString(), inline: true },
         { name: "Total Price", value: `${ticketData.totalPrice || 0} <:dl:1435564709913956373>`, inline: true },
@@ -580,7 +578,6 @@ async function archiveTicketHistory(
 }
 
 async function handleCloseModalSubmit(interaction) {
-  // check permission again — modal submit could be invoked by someone else
   const allowed = await isInteractionMemberStaff(interaction);
   if (!allowed) {
     return interaction.reply({
@@ -594,26 +591,15 @@ async function handleCloseModalSubmit(interaction) {
   const reason =
   interaction.fields.getTextInputValue("close_reason") ||
   "No reason provided";
+  const totalPrice = interaction.fields.getTextInputValue("close_total_price");
 
-// Ambil Total Price dari modal
-const totalPrice = interaction.fields.getTextInputValue("close_total_price");
-
-// Validasi angka
-if (!/^[0-9]+$/.test(totalPrice)) {
+  if (!/^[0-9]+$/.test(totalPrice)) {
   return interaction.editReply("❌ Total Price hanya boleh diisi angka.");
 }
 
 const priceValue = parseInt(totalPrice);
-
-// Convert khusus total price → DL (WL/100)
 const convertedTotalPrice = priceValue / 100;
-
-// Tax tetap 5% dari angka asli
 const tax = Math.floor(priceValue * 0.05);
-
-// ------------------------------------
-// 🔥 BARU AMBIL ticketData DI SINI !!
-// ------------------------------------
 const ticketData = tickets[interaction.channel.id];
 
 if (!ticketData) {
@@ -622,8 +608,7 @@ if (!ticketData) {
   });
 }
 
-// Simpan data final
-ticketData.totalPrice = convertedTotalPrice;   // hasil convert
+ticketData.totalPrice = convertedTotalPrice;  
 ticketData.tax = tax;
 ticketData.status = "closed";
 ticketData.closedBy = interaction.user.id;
@@ -694,9 +679,6 @@ saveTickets(tickets);
   }, 5000);
 }
 
-
-/* ---------- Main / Events ---------- */
-
 async function main() {
   console.log("🚀 Starting Discord Ticket Bot...");
   const client = await getDiscordClient();
@@ -708,9 +690,7 @@ async function main() {
     console.log("  !setup - Send the ticket panel to this channel");
     console.log("  !setcategory <category_id> - Set the ticket category");
     console.log("  !setlog <channel_id> - Set the log channel");
-    console.log(
-      "  !setarchive <channel_id> - Set the archive channel for closed tickets",
-    );
+    console.log("  !setarchive <channel_id> - Set the archive channel for closed tickets",);
     console.log("  !addrole <@role> - Add a staff role for tickets");
     console.log("  !removerole <@role> - Remove a staff role");
     console.log("  !listroles - List all configured staff roles");
@@ -720,13 +700,9 @@ async function main() {
 
   client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
-
-    // require admin permission for setup/config commands
     if (message.content === "!setup") {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
-        return message.reply(
-          "❌ You need Administrator permission to use this command.",
-        );
+        return message.reply("❌ You need Administrator permission to use this command.",);
       await createButtonPanel(message.channel);
       return message.reply("✅ Ticket panel has been created!");
     }
@@ -745,9 +721,7 @@ async function main() {
 
     if (message.content.startsWith("!setlog ")) {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
-        return message.reply(
-          "❌ You need Administrator permission to use this command.",
-        );
+        return message.reply("❌ You need Administrator permission to use this command.",);
       const channelId = message.content.split(" ")[1];
       const config = loadConfig();
       config.logChannelId = channelId;
@@ -757,28 +731,20 @@ async function main() {
 
     if (message.content.startsWith("!addrole ")) {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
-        return message.reply(
-          "❌ You need Administrator permission to use this command.",
-        );
+        return message.reply("❌ You need Administrator permission to use this command.",);
       const roleId = message.content.split(" ")[1].replace(/[<@&>]/g, "");
       const config = loadConfig();
       if (!config.staffRoles) config.staffRoles = [];
       if (config.staffRoles.includes(roleId))
-        return message.reply(
-          "❌ This role is already configured as a staff role.",
-        );
+        return message.reply("❌ This role is already configured as a staff role.",);
       config.staffRoles.push(roleId);
       saveConfig(config);
-      return message.reply(
-        `✅ Staff role <@&${roleId}> added to ticket system.`,
-      );
+      return message.reply(`✅ Staff role <@&${roleId}> added to ticket system.`,);
     }
 
     if (message.content.startsWith("!removerole ")) {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
-        return message.reply(
-          "❌ You need Administrator permission to use this command.",
-        );
+        return message.reply("❌ You need Administrator permission to use this command.",);
       const roleId = message.content.split(" ")[1].replace(/[<@&>]/g, "");
       const config = loadConfig();
       if (!config.staffRoles) config.staffRoles = [];
@@ -787,30 +753,22 @@ async function main() {
         return message.reply("❌ This role is not configured as a staff role.");
       config.staffRoles.splice(index, 1);
       saveConfig(config);
-      return message.reply(
-        `✅ Staff role <@&${roleId}> removed from ticket system.`,
-      );
+      return message.reply(`✅ Staff role <@&${roleId}> removed from ticket system.`,);
     }
 
     if (message.content === "!listroles") {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
-        return message.reply(
-          "❌ You need Administrator permission to use this command.",
-        );
+        return message.reply("❌ You need Administrator permission to use this command.",);
       const config = loadConfig();
       if (!config.staffRoles || config.staffRoles.length === 0)
-        return message.reply(
-          "❌ No staff roles configured. Use `!addrole <role_id>` to add one.",
-        );
+        return message.reply("❌ No staff roles configured. Use `!addrole <role_id>` to add one.",);
       const rolesList = config.staffRoles.map((id) => `<@&${id}>`).join(", ");
       return message.reply(`📋 **Configured Staff Roles:**\n${rolesList}`);
     }
 
     if (message.content.startsWith("!setpricejasa ")) {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
-        return message.reply(
-          "❌ You need Administrator permission to use this command.",
-        );
+        return message.reply("❌ You need Administrator permission to use this command.",);
       const channelId = message.content.split(" ")[1].replace(/[<#>]/g, "");
       const config = loadConfig();
       config.priceJasaChannelId = channelId;
@@ -820,9 +778,7 @@ async function main() {
 
     if (message.content.startsWith("!setpricelock ")) {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
-        return message.reply(
-          "❌ You need Administrator permission to use this command.",
-        );
+        return message.reply("❌ You need Administrator permission to use this command.",);
       const channelId = message.content.split(" ")[1].replace(/[<#>]/g, "");
       const config = loadConfig();
       config.priceLockChannelId = channelId;
@@ -832,9 +788,7 @@ async function main() {
 
     if (message.content.startsWith("!setarchive ")) {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
-        return message.reply(
-          "❌ You need Administrator permission to use this command.",
-        );
+        return message.reply("❌ You need Administrator permission to use this command.",);
       const channelId = message.content.split(" ")[1].replace(/[<#>]/g, "");
       const config = loadConfig();
       config.archiveChannelId = channelId;
@@ -856,23 +810,19 @@ async function main() {
   if (!text)
     return message.reply("⚠️ Please provide the text.\nExample: `!addchat Hello everyone!`");
 
-  // hapus pesan user
-  message.delete().catch(() => {});
+      message.delete().catch(() => {});
 
-  // Data otomatis server
   const guildName = message.guild.name;
   const guildIcon = message.guild.iconURL({ dynamic: true });
-
-  // Display name (nickname / username)
   const displayName = message.member.displayName || message.author.username;
 
   const embed = new EmbedBuilder()
     .setColor("#1ABC9C")
     .setAuthor({
-      name: `${guildName}`,       // lebih tebal
+      name: `${guildName}`,       
       iconURL: guildIcon
     })
-    .setDescription(text)             // tanpa garis / dekorasi
+    .setDescription(text)             
     .setFooter({
       text: `${displayName} • ${new Date().toLocaleString()}`,
     })
@@ -892,7 +842,6 @@ async function main() {
 
         let content = targetMsg.content;
 
-        // Jika pesan berupa embed → ambil description
         if (!content && targetMsg.embeds.length > 0) {
             const embed = targetMsg.embeds[0];
             content = embed.description || "(embed tidak punya text)";
@@ -900,7 +849,6 @@ async function main() {
 
         if (!content) return message.reply("❌ Pesan tidak berisi teks.");
 
-        // Kirim ulang teks saja tanpa embed
         return message.channel.send(content);
 
     } catch {
@@ -991,7 +939,7 @@ async function main() {
 
   client.on("guildMemberAdd", async (member) => {
   try {
-    const config = loadConfig(); // FIX WAJIB ADA
+    const config = loadConfig(); 
 
     if (!config.welcomeChannel) return;
 
@@ -1002,7 +950,7 @@ async function main() {
     const avatar = member.user.displayAvatarURL({ dynamic: true });
 
     const embed = new EmbedBuilder()
-      .setColor("#00FFF0") // AQUA
+      .setColor("#00FFF0") 
       .setDescription(
         `**WELCOME ${member} IN ${guildName}**\n\n` +
         `Take Role In Here <#961045481977417819>\n` +
