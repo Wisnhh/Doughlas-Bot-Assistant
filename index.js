@@ -952,19 +952,16 @@ async function main() {
 const embed = new EmbedBuilder()
   .setColor("#00FFF0") 
   .setDescription(`
-<:koceng:1441979707632521296> **WELCOME ${member} IN ${guildName}**
+<a:koceng:1441979707632521296> **WELCOME ${member} IN ${guildName}** <a:koceng:1441979707632521296>
 
-<:kanan:1441979773109665854> **Take Role In Here**
-<:arrow:1441981304177561691> <#961045481977417819>
-
-<:kanan:1441979773109665854> **Buy Jasa In Here**
-<:arrow:1441981304177561691> <#1432736607169155072>
-
-<:kanan:1441979773109665854> **Testi In Here**
-<:arrow:1441981304177561691> <#1433716636208070758>
-
-<:kanan:1441979773109665854> **Free Auto Post Here**
-<:arrow:1441981304177561691> <#1451196979169460255>
+<a:kanan:1441979773109665854> **Take Role In Here**
+<a:arrow:1441981304177561691> <#961045481977417819>
+<a:kanan:1441979773109665854> **Buy Jasa In Here**
+<a:arrow:1441981304177561691> <#1432736607169155072>
+<a:kanan:1441979773109665854> **Testi In Here**
+<a:arrow:1441981304177561691> <#1433716636208070758>
+<a:kanan:1441979773109665854> **Free Auto Post Here**
+<a:arrow:1441981304177561691> <#1451196979169460255>
 
 **Thanks For Joining My Server**
   `)
