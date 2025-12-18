@@ -949,18 +949,27 @@ async function main() {
 
     const guildName = member.guild.name;
     const avatar = member.user.displayAvatarURL({ dynamic: true });
+const embed = new EmbedBuilder()
+  .setColor("#00FFF0") 
+  .setDescription(`
+<:koceng:1441979707632521296> **WELCOME ${member} IN ${guildName}**
 
-    const embed = new EmbedBuilder()
-      .setColor("#00FFF0") 
-      .setDescription(
-        `**WELCOME ${member} IN ${guildName}**\n\n` +
-        `Take Role In Here <#961045481977417819>\n` +
-        `Buy Jasa In Here <#1432736607169155072>\n` +
-        `Testi In Here <#1433716636208070758>\n\n` +
-        `**Thanks For Join In My Server**`
-      )
-      .setThumbnail(avatar)
-      .setFooter({ text: `Member Count: ${member.guild.memberCount}` });
+<:kanan:1441979773109665854> **Take Role In Here**
+<:arrow:1441981304177561691> <#961045481977417819>
+
+<:kanan:1441979773109665854> **Buy Jasa In Here**
+<:arrow:1441981304177561691> <#1432736607169155072>
+
+<:kanan:1441979773109665854> **Testi In Here**
+<:arrow:1441981304177561691> <#1433716636208070758>
+
+<:kanan:1441979773109665854> **Free Auto Post Here**
+<:arrow:1441981304177561691> <#1451196979169460255>
+
+**Thanks For Joining My Server**
+  `)
+  .setThumbnail(avatar)
+  .setFooter({ text: `Member Count: ${member.guild.memberCount}` });
 
     await channel.send({ embeds: [embed] });
 
