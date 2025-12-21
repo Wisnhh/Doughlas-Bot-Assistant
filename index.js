@@ -5,22 +5,9 @@ process.on("unhandledRejection", (error) => {
 process.on("uncaughtException", (error) => {
   console.error("Uncaught exception:", error);
 });
-
-import {
-  Client,
-  GatewayIntentBits,
-  ButtonBuilder,
-  ButtonStyle,
-  ActionRowBuilder,
-  EmbedBuilder,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  ChannelType,
-  PermissionFlagsBits,
-  StringSelectMenuBuilder,
-} from "discord.js";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import mongoose from "mongoose";
+import { Config, Ticket } from "./database.js";
+import { Client, GatewayIntentBits, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, PermissionFlagsBits, StringSelectMenuBuilder,} from "discord.js";
 
 async function getDiscordClient() {
   const token = process.env.DISCORD_BOT_TOKEN;
@@ -42,49 +29,6 @@ async function getDiscordClient() {
   await client.login(token);
   return client;
 }
-
-function loadConfig() {
-  try {
-    return JSON.parse(readFileSync("config.json", "utf8"));
-  } catch (error) {
-    return {
-      ticketCategoryId: "",
-      logChannelId: "",
-      setupChannelId: "",
-      staffRoles: [],
-      archiveChannelId: "",
-    };
-  }
-}
-
-function saveConfig(config) {
-  writeFileSync("config.json", JSON.stringify(config, null, 2));
-}
-
-function loadTickets() {
-  try {
-    if (existsSync("tickets.json")) {
-      return JSON.parse(readFileSync("tickets.json", "utf8"));
-    }
-  } catch (error) {
-    console.error("Error loading tickets:", error);
-  }
-  return {};
-}
-
-function saveTickets(tickets) {
-  writeFileSync("tickets.json", JSON.stringify(tickets, null, 2));
-}
-
-let ticketCounter = 0;
-const tickets = loadTickets();
-
-if (Object.keys(tickets).length > 0) {
-  const ticketNumbers = Object.values(tickets).map((t) => t.ticketNumber || 0);
-  ticketCounter = Math.max(0, ...ticketNumbers);
-}
-
-/* ---------- Helpers ---------- */
 
 async function isInteractionMemberStaff(interaction) {
   const config = loadConfig();
@@ -682,6 +626,26 @@ saveTickets(tickets);
 
 async function main() {
   console.log("🚀 Starting Discord Ticket Bot...");
+
+  const mongoUri = process.env.MONGODB_URI;
+
+  if (!mongoUri) {
+    console.error(
+      "❌ ERROR: MONGODB_URI tidak ditemukan di Environment Variables Railway!",
+    );
+    console.log("Pastikan kamu sudah menambahkan MONGODB_URI di tab Variables.");
+    process.exit(1);
+  }
+
+  try {
+    console.log("Connecting to MongoDB...");
+    await mongoose.connect(mongoUri);
+    console.log("📂 Connected to MongoDB Database");
+  } catch (err) {
+    console.error("❌ Gagal terhubung ke MongoDB:", err);
+    process.exit(1);
+  }
+
   const client = await getDiscordClient();
 
   client.once("ready", () => {
@@ -691,13 +655,17 @@ async function main() {
     console.log("  !setup - Send the ticket panel to this channel");
     console.log("  !setcategory <category_id> - Set the ticket category");
     console.log("  !setlog <channel_id> - Set the log channel");
-    console.log("  !setarchive <channel_id> - Set the archive channel for closed tickets",);
+    console.log("  !setarchive <channel_id> - Set the archive channel");
     console.log("  !addrole <@role> - Add a staff role for tickets");
     console.log("  !removerole <@role> - Remove a staff role");
     console.log("  !listroles - List all configured staff roles");
     console.log("  !setpricejasa <channel_id> - Set PRICE JASA info channel");
     console.log("  !setpricelock <channel_id> - Set PRICE LOCK info channel");
   });
+}
+
+// Jalankan fungsi main
+main().catch(console.error);
 
   client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
