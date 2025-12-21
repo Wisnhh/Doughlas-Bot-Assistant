@@ -60,6 +60,7 @@ function loadConfig() {
 function saveConfig(config) {
   writeFileSync("config.json", JSON.stringify(config, null, 2));
 }
+  let jasaMessageData = { lastMessageId: null, channelId: null, admins: {} };
 
 function loadTickets() {
   try {
@@ -701,6 +702,43 @@ async function main() {
 
   client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
+    const staffRoleId = "1433507603123540008";
+    const hasJasaRole = message.member?.roles.cache.has(staffRoleId);
+    const adminMention = `<@${message.author.id}>`;
+    const permanentAdmins = ["707480543834669116", "864073279869026305", "1172741711257153566"];
+
+    if (message.content.toLowerCase() === "!notif") {
+      const embed = createJasaEmbed(jasaMessageData);
+      const sentMessage = await message.channel.send({ embeds: [embed] });
+      jasaMessageData.lastMessageId = sentMessage.id;
+      jasaMessageData.channelId = message.channel.id;
+      return;
+    }
+
+    if (hasJasaRole && permanentAdmins.includes(message.author.id)) {
+      let statusChanged = false;
+      if (message.content.toLowerCase() === "!onjasa") {
+        jasaMessageData.admins[adminMention] = "ready";
+        statusChanged = true;
+      } else if (message.content.toLowerCase() === "!offjasa") {
+        jasaMessageData.admins[adminMention] = "close";
+        statusChanged = true;
+      }
+
+      if (statusChanged) {
+        message.react("✅");
+        if (jasaMessageData.lastMessageId && jasaMessageData.channelId) {
+          try {
+            const channel = await client.channels.fetch(jasaMessageData.channelId);
+            const targetMsg = await channel.messages.fetch(jasaMessageData.lastMessageId);
+            await targetMsg.edit({ embeds: [createJasaEmbed(jasaMessageData)] });
+          } catch (err) {
+            console.log("Embed tidak ditemukan, ketik !notif lagi.");
+          }
+        }
+        return;
+      }
+    }
     if (message.content === "!setup") {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
         return message.reply("❌ You need Administrator permission to use this command.",);
@@ -1084,3 +1122,26 @@ const embed = new EmbedBuilder()
 }
 
 main().catch(console.error);
+
+// Baris paling bawah - Fungsi tampilan embed jasa
+function createJasaEmbed(data) {
+  const permanentAdmins = [
+    "707480543834669116",
+    "864073279869026305",
+    "1172741711257153566"
+  ];
+
+  let description = "";
+  permanentAdmins.forEach((id, index) => {
+    const mention = `<@${id}>`;
+    const status = data.admins[mention] || "close";
+    description += `• ${mention} (${status}) take jasa\n`;
+  });
+
+  return new EmbedBuilder()
+    .setTitle("LIST ADMIN READY/UNREADY")
+    .setColor(0x00ffff)
+    .setDescription(description)
+    .setTimestamp()
+    .setFooter({ text: "Real-time Notification System" });
+}
