@@ -1123,7 +1123,6 @@ const embed = new EmbedBuilder()
 
 main().catch(console.error);
 
-// Baris paling bawah - Fungsi tampilan embed jasa
 function createJasaEmbed(data) {
   const permanentAdmins = [
     "707480543834669116",
@@ -1135,11 +1134,11 @@ function createJasaEmbed(data) {
   permanentAdmins.forEach((id, index) => {
     const mention = `<@${id}>`;
     const status = data.admins[mention] || "close";
-    description += `• ${mention} (${status}) take jasa\n`;
+    description += `<a:kanan:1441979773109665854> ${mention} (${status}) take jasa\n`;
   });
 
   return new EmbedBuilder()
-    .setTitle("LIST ADMIN READY/UNREADY")
+    .setTitle("<a:koceng:1441979707632521296> **LIST ADMIN READY/UNREADY** <a:koceng:1441979707632521296>")
     .setColor(0x00ffff)
     .setDescription(description)
     .setTimestamp()
