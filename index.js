@@ -1,0 +1,1086 @@
+process.on("unhandledRejection", (error) => {
+  console.error("Unhandled promise rejection:", error);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+});
+
+import {
+  Client,
+  GatewayIntentBits,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
+  EmbedBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ChannelType,
+  PermissionFlagsBits,
+  StringSelectMenuBuilder,
+} from "discord.js";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+
+async function getDiscordClient() {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) {
+    throw new Error(
+      "DISCORD_BOT_TOKEN not found in environment variables. Please add your Discord bot token to Secrets.",
+    );
+  }
+
+  const client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMembers,
+    ],
+  });
+
+  await client.login(token);
+  return client;
+}
+
+function loadConfig() {
+  try {
+    return JSON.parse(readFileSync("config.json", "utf8"));
+  } catch (error) {
+    return {
+      ticketCategoryId: "",
+      logChannelId: "",
+      setupChannelId: "",
+      staffRoles: [],
+      archiveChannelId: "",
+    };
+  }
+}
+
+function saveConfig(config) {
+  writeFileSync("config.json", JSON.stringify(config, null, 2));
+}
+
+function loadTickets() {
+  try {
+    if (existsSync("tickets.json")) {
+      return JSON.parse(readFileSync("tickets.json", "utf8"));
+    }
+  } catch (error) {
+    console.error("Error loading tickets:", error);
+  }
+  return {};
+}
+
+function saveTickets(tickets) {
+  writeFileSync("tickets.json", JSON.stringify(tickets, null, 2));
+}
+
+let ticketCounter = 0;
+const tickets = loadTickets();
+
+if (Object.keys(tickets).length > 0) {
+  const ticketNumbers = Object.values(tickets).map((t) => t.ticketNumber || 0);
+  ticketCounter = Math.max(0, ...ticketNumbers);
+}
+
+/* ---------- Helpers ---------- */
+
+async function isInteractionMemberStaff(interaction) {
+  const config = loadConfig();
+  if (!interaction.guild) return false;
+  // ensure member object
+  let member = interaction.member;
+  try {
+    if (!member || !member.roles) {
+      member = await interaction.guild.members.fetch(interaction.user.id);
+    }
+  } catch (err) {
+    console.error("Failed fetching member for permission check:", err);
+    return false;
+  }
+  if (!member) return false;
+  const staffRoles = Array.isArray(config.staffRoles) ? config.staffRoles : [];
+  return member.roles.cache.some((r) => staffRoles.includes(r.id));
+}
+
+function sanitizeChannelName(input, fallback = "service") {
+  if (!input) return fallback;
+  // Lowercase, replace spaces and invalid chars with hyphens, collapse multiple hyphens
+  let name = String(input)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove diacritics
+    .replace(/[^a-z0-9-_ ]+/g, "") // keep alnum, hyphen, underscore, space
+    .trim()
+    .replace(/\s+/g, "-") // spaces -> hyphen
+    .replace(/-+/g, "-"); // collapse multiple hyphens
+  if (!name) name = fallback;
+  // Discord channel name max length ~100, keep safe margin
+  if (name.length > 70) name = name.slice(0, 70);
+  return name;
+}
+
+/* ---------- Panel / Modal / Ticket Creation ---------- */
+
+async function createButtonPanel(channel) {
+  const embed = new EmbedBuilder()
+    .setColor("#5865F2")
+    .setTitle("🎫 Doughlas Ticket System")
+    .setDescription(
+      "Click one of the buttons below to get started order:\n\n🎟️ **Create Ticket** - Create a new support ticket\n🏆 **Price Jasa** - Service price information\n🔒 **Price Lock** - Price lock information",
+    )
+    .setTimestamp();
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("create_ticket")
+      .setLabel("Create Ticket")
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji("🎟️"),
+    new ButtonBuilder()
+      .setCustomId("price_jasa")
+      .setLabel("Price Jasa")
+      .setStyle(ButtonStyle.Success)
+      .setEmoji("🏆"),
+    new ButtonBuilder()
+      .setCustomId("price_lock")
+      .setLabel("Price Lock")
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji("🔒"),
+  );
+
+  await channel.send({ embeds: [embed], components: [row] });
+}
+
+async function handleCreateTicket(interaction) {
+  const modal = new ModalBuilder()
+    .setCustomId("ticket_modal")
+    .setTitle("Create Support Ticket");
+
+  const subjectInput = new TextInputBuilder()
+    .setCustomId("ticket_subject")
+    .setLabel("NAME WORLD")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Put Your World Name Here")
+    .setRequired(true)
+    .setMaxLength(100);
+
+  const descriptionInput = new TextInputBuilder()
+    .setCustomId("ticket_description")
+    .setLabel("SERVICE")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Please Select The Service You Want To Buy")
+    .setRequired(true)
+    .setMaxLength(50);
+
+  const categoryInput = new TextInputBuilder()
+    .setCustomId("ticket_category")
+    .setLabel("AMMOUNT")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Enter The Amount You want To Buy")
+    .setRequired(true)
+    .setMaxLength(1000);
+
+  const uwsInput = new TextInputBuilder()
+    .setCustomId("ticket_uws")
+    .setLabel("UWS")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Uws Buyyer Or Uws Seller (leave blank if you don't buy ptht services)")
+    .setRequired(false)
+    .setMaxLength(100);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(subjectInput),
+    new ActionRowBuilder().addComponents(descriptionInput),
+    new ActionRowBuilder().addComponents(categoryInput),
+    new ActionRowBuilder().addComponents(uwsInput),
+  );
+
+  await interaction.showModal(modal);
+}
+
+const pendingTickets = new Map();
+
+async function handleTicketModalSubmit(interaction) {
+  const description =
+    interaction.fields.getTextInputValue("ticket_description");
+  const subject = interaction.fields.getTextInputValue("ticket_subject");
+  const category = interaction.fields.getTextInputValue("ticket_category");
+  const uws = interaction.fields.getTextInputValue("ticket_uws");
+
+  const config = loadConfig();
+  const guild = interaction.guild;
+
+  const availableRoles = guild.roles.cache
+    .filter(
+      (role) =>
+        !role.managed &&
+        role.name !== "@everyone" &&
+        config.staffRoles.includes(role.id),
+    )
+    .sort((a, b) => b.position - a.position)
+    .map((role) => ({ label: role.name, value: role.id }));
+
+  if (availableRoles.length === 0) {
+    availableRoles.push({ label: "No Staff Roles Configured", value: "none" });
+  }
+
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId("ticket_role_select")
+    .setPlaceholder("Select which staff role to notify")
+    .addOptions(availableRoles.slice(0, 25));
+
+  const row = new ActionRowBuilder().addComponents(selectMenu);
+
+  pendingTickets.set(interaction.user.id, { subject, description, category, uws });
+
+  await interaction.reply({
+    content:
+      "Please Select Roles Before You Create Ticket :D",
+    components: [row],
+    ephemeral: true,
+  });
+}
+
+async function handleRoleSelect(interaction) {
+  const ticketData = pendingTickets.get(interaction.user.id);
+  if (!ticketData) {
+    return await interaction.reply({
+      content: "❌ Ticket data not found. Please try creating a ticket again.",
+      ephemeral: true,
+    });
+  }
+
+  await interaction.deferUpdate();
+  await interaction.editReply({
+    content: "⏳ Creating your ticket...",
+    components: [],
+  });
+
+  const { subject, description, category, uws } = ticketData;
+  const selectedRoleId = interaction.values[0];
+
+  ticketCounter++;
+
+  const config = loadConfig();
+  const guild = interaction.guild;
+
+  let ticketCategory = null;
+  if (config.ticketCategoryId) {
+    ticketCategory = guild.channels.cache.get(config.ticketCategoryId);
+  }
+
+  // build sanitized channel name: ticket-<service>-<player>
+  const serviceName = sanitizeChannelName(description, "service");
+  let playerName = interaction.member?.displayName || interaction.user.username; 
+  playerName = sanitizeChannelName(playerName, "player");
+
+  const channelName = `ticket-${serviceName}-${playerName}`;
+
+  const permissionOverwrites = [
+    { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+    {
+      id: interaction.user.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+      ],
+    },
+  ];
+
+  const ticketChannel = await guild.channels.create({
+    name: channelName,
+    type: ChannelType.GuildText,
+    parent: ticketCategory?.id || null,
+    topic: `Ticket #${ticketCounter} - ${subject}`,
+    permissionOverwrites,
+  });
+
+  let roleMention = "";
+  if (selectedRoleId && selectedRoleId !== "none") {
+    const role = guild.roles.cache.get(selectedRoleId);
+    if (role) {
+      await ticketChannel.permissionOverwrites.create(role, {
+        ViewChannel: true,
+        SendMessages: true,
+        ReadMessageHistory: true,
+      });
+      roleMention = `<@&${role.id}>`;
+    }
+  }
+
+  pendingTickets.delete(interaction.user.id);
+
+  const ticketEmbed = new EmbedBuilder()
+    .setColor("#00FF00")
+    .setTitle(`DOUGHLAS TICKCET`)
+    .setDescription(
+      `**World Name:** ${ticketData.subject}\n**Service:** ${ticketData.description}\n**AMMOUNT:** ${ticketData.category}\n**UWS:** ${uws || "-"}`,
+    )
+    .addFields(
+      { name: "Service", value: description },
+      { name: "Created by", value: `<@${interaction.user.id}>`, inline: true },
+      { name: "Created at", value: new Date().toLocaleString(), inline: true },
+    )
+    .setTimestamp();
+
+  if (roleMention)
+    ticketEmbed.addFields({
+      name: "Assigned Role",
+      value: roleMention,
+      inline: true,
+    });
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("close_ticket")
+      .setLabel("Close Ticket")
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji("🔒"),
+    new ButtonBuilder()
+      .setCustomId("claim_ticket")
+      .setLabel("Claim Ticket")
+      .setStyle(ButtonStyle.Success)
+      .setEmoji("✋"),
+  );
+
+  const message = roleMention
+    ? `${roleMention} New ticket created by <@${interaction.user.id}>`
+    : `<@${interaction.user.id}> Your ticket has been created!`;
+
+  await ticketChannel.send({
+    content: message,
+    embeds: [ticketEmbed],
+    components: [actionRow],
+  });
+
+  // store detailed ticket info
+  tickets[ticketChannel.id] = {
+    ticketNumber: ticketCounter,
+    channelId: ticketChannel.id,
+    userId: interaction.user.id,
+    subject,
+    description, 
+    category,
+    uws,
+    status: "open",
+    createdAt: new Date().toISOString(),
+    claimedBy: null,
+  };
+  saveTickets(tickets);
+
+  if (config.logChannelId) {
+    const logChannel = guild.channels.cache.get(config.logChannelId);
+    if (logChannel) {
+      const logEmbed = new EmbedBuilder()
+        .setColor("#00FF00")
+        .setTitle("📝 New Ticket Created")
+        .addFields(
+          { name: "Ticket", value: `#${ticketCounter}`, inline: true },
+          { name: "Channel", value: `<#${ticketChannel.id}>`, inline: true },
+          { name: "User", value: `<@${interaction.user.id}>`, inline: true },
+          { name: "Subject", value: subject },
+          { name: "Service", value: description, inline: true },
+          { name: "Ammount", value: category, inline: true },
+          { name: "UWS", value: uws || "None", inline: true },
+        )
+        .setTimestamp();
+      await logChannel.send({ embeds: [logEmbed] });
+    }
+  }
+
+  await interaction.editReply({
+    content: `✅ Your ticket has been created: <#${ticketChannel.id}>`,
+    ephemeral: true,
+  });
+}
+
+/* ---------- Claim & Close (permission-restricted) ---------- */
+
+async function handleClaimTicket(interaction) {
+  const config = loadConfig();
+  // ensure member fetched & check staff permission
+  const allowed = await isInteractionMemberStaff(interaction);
+  if (!allowed) {
+    return interaction.reply({
+      content: "❌ You do not have permission to claim.",
+      ephemeral: true,
+    });
+  }
+
+  const ticketData = tickets[interaction.channel.id];
+  if (!ticketData) {
+    return interaction.reply({
+      content: "❌ This is not a valid ticket channel.",
+      ephemeral: true,
+    });
+  }
+
+  if (ticketData.claimedBy) {
+    return interaction.reply({
+      content: `❌ This ticket is already claimed by <@${ticketData.claimedBy}>`,
+      ephemeral: true,
+    });
+  }
+
+  ticketData.claimedBy = interaction.user.id;
+  ticketData.status = "in-progress";
+  saveTickets(tickets);
+
+  // rename channel to ticket-<service>-<staffname>
+  try {
+    const serviceName = sanitizeChannelName(
+      ticketData.description || "service",
+    );
+const staffName =
+      interaction.member?.displayName || `staff${interaction.user.id}`;
+      
+    const staffSan = sanitizeChannelName(staffName, "staff");
+    const newName = `Service-${serviceName}-By-${staffSan}`;
+
+    await interaction.channel.setName(newName).catch((err) => {
+    });
+  } catch (err) {
+    console.error("Error while renaming channel on claim:", err);
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor("#FFA500")
+    .setTitle("✋ Ticket Claimed")
+    .setDescription(`This ticket is now handled by <@${interaction.user.id}>`)
+    .setTimestamp();
+
+  await interaction.reply({ embeds: [embed] });
+}
+
+async function handleCloseTicket(interaction) {
+  const allowed = await isInteractionMemberStaff(interaction);
+  if (!allowed) {
+    return interaction.reply({
+      content: "❌ You do not have permission to close.",
+      ephemeral: true,
+    });
+  }
+
+  const ticketData = tickets[interaction.channel.id];
+  if (!ticketData) {
+    return interaction.reply({
+      content: "❌ This is not a valid ticket channel.",
+      ephemeral: true,
+    });
+  }
+
+  const modal = new ModalBuilder()
+  .setCustomId("close_modal")
+  .setTitle("Close Ticket");
+
+const reasonInput = new TextInputBuilder()
+  .setCustomId("close_reason")
+  .setLabel("Description")
+  .setStyle(TextInputStyle.Short)
+  .setPlaceholder("Done/Cancel/More....")
+  .setRequired(true);
+
+const priceInput = new TextInputBuilder()
+  .setCustomId("close_total_price")
+  .setLabel("Total Price")
+  .setStyle(TextInputStyle.Short)
+  .setPlaceholder("write in the amount of wl/tulis pakai format wl")
+  .setRequired(true);
+
+modal.addComponents(
+  new ActionRowBuilder().addComponents(reasonInput),
+  new ActionRowBuilder().addComponents(priceInput));
+  await interaction.showModal(modal);
+}
+
+async function archiveTicketHistory(
+  channel,
+  ticketData,
+  closedBy,
+  closeReason,
+  archiveChannel,
+) {
+  try {
+    const messages = [];
+    let lastMessageId;
+    while (true) {
+      const options = { limit: 100 };
+      if (lastMessageId) options.before = lastMessageId;
+      const fetchedMessages = await channel.messages.fetch(options);
+      if (fetchedMessages.size === 0) break;
+      messages.push(...fetchedMessages.values());
+      lastMessageId = fetchedMessages.last().id;
+      if (fetchedMessages.size < 100) break;
+    }
+
+    messages.reverse();
+
+    let chatHistory = "";
+    for (const msg of messages) {
+      if (msg.author.bot && !msg.webhookId) continue;
+
+      const timestamp = msg.createdAt.toLocaleString();
+      const author = msg.author.username;
+      const content = msg.content || "";
+      
+      if (!content.trim()) continue;
+      chatHistory += `[${timestamp}] ${author}: ${content}\n`;
+    }
+
+    if (chatHistory.length === 0) chatHistory = "_No chat history available._";
+    const archiveEmbed = new EmbedBuilder()
+      .setColor("#ff3333")
+      .setTitle(`DOUGHLAS TICKET ARCHIVE`)
+      .addFields(
+        { name: "Client", value: `<@${ticketData.userId}>`, inline: true },
+        {
+          name: "Admin",
+          value: `<@${ticketData.claimedBy || closedBy}>`,
+          inline: true,
+        },
+        {
+          name: "World",
+          value: ticketData.subject || "-",
+          inline: true,
+        },
+
+        { name: "Service", value: ticketData.description || "-", inline: true },
+        { name: "Amount", value: ticketData.category || "0", inline: true },
+        { name: "Uws", value: ticketData.uws || "-", inline: true },
+        { name: "Status", value: "Closed", inline: true },
+        { name: "Closed at", value: new Date().toLocaleString(), inline: true },
+        { name: "Total Price", value: `${ticketData.totalPrice || 0} <:dl:1435564709913956373>`, inline: true },
+        { name: "Tax", value: `${ticketData.tax || 0} <:wl:1435565382164545576>`, inline: true },
+        
+        {
+          name: "Description",
+          value: closeReason || "No note provided",
+          inline: false,
+        },
+        {
+          name: "Chat History",
+          value:
+            "```" +
+            (chatHistory.length > 1000
+              ? chatHistory.slice(0, 1000) + "\n... (truncated)"
+              : chatHistory) +
+            "```",
+        },
+      )
+      .setTimestamp();
+
+    await archiveChannel.send({ embeds: [archiveEmbed] });
+  } catch (error) {
+    console.error("Error archiving ticket history:", error);
+  }
+}
+
+async function handleCloseModalSubmit(interaction) {
+  const allowed = await isInteractionMemberStaff(interaction);
+  if (!allowed) {
+    return interaction.reply({
+      content: "❌ You do not have permission to close.",
+      ephemeral: true,
+    });
+  }
+
+  await interaction.deferReply();
+
+  const reason =
+  interaction.fields.getTextInputValue("close_reason") ||
+  "No reason provided";
+  const totalPrice = interaction.fields.getTextInputValue("close_total_price");
+
+  if (!/^[0-9]+$/.test(totalPrice)) {
+  return interaction.editReply("❌ Total Price hanya boleh diisi angka.");
+}
+
+const priceValue = parseInt(totalPrice);
+const convertedTotalPrice = priceValue / 100;
+const tax = Math.floor(priceValue * 0.05);
+const ticketData = tickets[interaction.channel.id];
+
+if (!ticketData) {
+  return await interaction.editReply({
+    content: "❌ This is not a valid ticket channel.",
+  });
+}
+
+ticketData.totalPrice = convertedTotalPrice;  
+ticketData.tax = tax;
+ticketData.status = "closed";
+ticketData.closedBy = interaction.user.id;
+ticketData.closedAt = new Date().toISOString();
+ticketData.closeReason = reason;
+
+saveTickets(tickets);
+
+  const closeEmbed = new EmbedBuilder()
+    .setColor("#FF0000")
+    .setTitle("🔒 Ticket Closed")
+    .setDescription(`This ticket has been closed by <@${interaction.user.id}>`)
+    .addFields(
+      { name: "Description", value: reason },
+      { name: "Total Price", value: `${ticketData.totalPrice} <:dl:1435564709913956373>`, inline: true },
+      { name: "Tax", value: `${ticketData.tax} <:wl:1435565382164545576>`, inline: true },
+      { name: "Closed at", value: new Date().toLocaleString() },
+    )
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [closeEmbed] });
+
+  const config = loadConfig();
+  if (config.logChannelId) {
+    const logChannel = interaction.guild.channels.cache.get(
+      config.logChannelId,
+    );
+    if (logChannel) {
+      const logEmbed = new EmbedBuilder()
+        .setColor("#FF0000")
+        .setTitle("🔒 Ticket Closed")
+        .addFields(
+          { name: "Ticket", value: `#${ticketData.ticketNumber}`, inline: true },
+          { name: "Channel", value: `<#${interaction.channel.id}>`, inline: true },
+          { name: "Closed by", value: `<@${interaction.user.id}>`, inline: true },
+          { name: "Total Price", value: `${priceValue} <:dl:1435564709913956373>` },
+          { name: "Tax", value: `${tax} <:wl:1435565382164545576>` },
+          { name: "Description", value: reason },
+        )
+        .setTimestamp();
+      await logChannel.send({ embeds: [logEmbed] });
+    }
+  }
+
+  if (config.archiveChannelId) {
+    const archiveChannel = interaction.guild.channels.cache.get(
+      config.archiveChannelId,
+    );
+    if (archiveChannel) {
+      await archiveTicketHistory(
+        interaction.channel,
+        ticketData,
+        interaction.user.id,
+        reason,
+        archiveChannel,
+      );
+    }
+  }
+
+  setTimeout(async () => {
+    try {
+      await interaction.channel.delete();
+      delete tickets[interaction.channel.id];
+      saveTickets(tickets);
+    } catch (error) {
+      console.error("Error deleting channel:", error);
+    }
+  }, 5000);
+}
+
+async function main() {
+  console.log("🚀 Starting Discord Ticket Bot...");
+  const client = await getDiscordClient();
+
+  client.once("ready", () => {
+    console.log(`✅ Logged in as ${client.user.tag}`);
+    console.log("📝 Bot is ready to manage tickets!");
+    console.log("\nAvailable commands:");
+    console.log("  !setup - Send the ticket panel to this channel");
+    console.log("  !setcategory <category_id> - Set the ticket category");
+    console.log("  !setlog <channel_id> - Set the log channel");
+    console.log("  !setarchive <channel_id> - Set the archive channel for closed tickets",);
+    console.log("  !addrole <@role> - Add a staff role for tickets");
+    console.log("  !removerole <@role> - Remove a staff role");
+    console.log("  !listroles - List all configured staff roles");
+    console.log("  !setpricejasa <channel_id> - Set PRICE JASA info channel");
+    console.log("  !setpricelock <channel_id> - Set PRICE LOCK info channel");
+  });
+
+  client.on("messageCreate", async (message) => {
+    if (message.author.bot) return;
+    if (message.content === "!setup") {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+        return message.reply("❌ You need Administrator permission to use this command.",);
+      await createButtonPanel(message.channel);
+      return message.reply("✅ Ticket panel has been created!");
+    }
+
+    if (message.content.startsWith("!setcategory ")) {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+        return message.reply(
+          "❌ You need Administrator permission to use this command.",
+        );
+      const categoryId = message.content.split(" ")[1];
+      const config = loadConfig();
+      config.ticketCategoryId = categoryId;
+      saveConfig(config);
+      return message.reply(`✅ Ticket category set to <#${categoryId}>`);
+    }
+
+    if (message.content.startsWith("!setlog ")) {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+        return message.reply("❌ You need Administrator permission to use this command.",);
+      const channelId = message.content.split(" ")[1];
+      const config = loadConfig();
+      config.logChannelId = channelId;
+      saveConfig(config);
+      return message.reply(`✅ Log channel set to <#${channelId}>`);
+    }
+
+    if (message.content.startsWith("!addrole ")) {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+        return message.reply("❌ You need Administrator permission to use this command.",);
+      const roleId = message.content.split(" ")[1].replace(/[<@&>]/g, "");
+      const config = loadConfig();
+      if (!config.staffRoles) config.staffRoles = [];
+      if (config.staffRoles.includes(roleId))
+        return message.reply("❌ This role is already configured as a staff role.",);
+      config.staffRoles.push(roleId);
+      saveConfig(config);
+      return message.reply(`✅ Staff role <@&${roleId}> added to ticket system.`,);
+    }
+
+    if (message.content.startsWith("!removerole ")) {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+        return message.reply("❌ You need Administrator permission to use this command.",);
+      const roleId = message.content.split(" ")[1].replace(/[<@&>]/g, "");
+      const config = loadConfig();
+      if (!config.staffRoles) config.staffRoles = [];
+      const index = config.staffRoles.indexOf(roleId);
+      if (index === -1)
+        return message.reply("❌ This role is not configured as a staff role.");
+      config.staffRoles.splice(index, 1);
+      saveConfig(config);
+      return message.reply(`✅ Staff role <@&${roleId}> removed from ticket system.`,);
+    }
+
+    if (message.content === "!listroles") {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+        return message.reply("❌ You need Administrator permission to use this command.",);
+      const config = loadConfig();
+      if (!config.staffRoles || config.staffRoles.length === 0)
+        return message.reply("❌ No staff roles configured. Use `!addrole <role_id>` to add one.",);
+      const rolesList = config.staffRoles.map((id) => `<@&${id}>`).join(", ");
+      return message.reply(`📋 **Configured Staff Roles:**\n${rolesList}`);
+    }
+
+    if (message.content.startsWith("!setpricejasa ")) {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+        return message.reply("❌ You need Administrator permission to use this command.",);
+      const channelId = message.content.split(" ")[1].replace(/[<#>]/g, "");
+      const config = loadConfig();
+      config.priceJasaChannelId = channelId;
+      saveConfig(config);
+      return message.reply(`✅ PRICE JASA channel set to <#${channelId}>`);
+    }
+
+    if (message.content.startsWith("!setpricelock ")) {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+        return message.reply("❌ You need Administrator permission to use this command.",);
+      const channelId = message.content.split(" ")[1].replace(/[<#>]/g, "");
+      const config = loadConfig();
+      config.priceLockChannelId = channelId;
+      saveConfig(config);
+      return message.reply(`✅ PRICE LOCK channel set to <#${channelId}>`);
+    }
+
+    if (message.content.startsWith("!setarchive ")) {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+        return message.reply("❌ You need Administrator permission to use this command.",);
+      const channelId = message.content.split(" ")[1].replace(/[<#>]/g, "");
+      const config = loadConfig();
+      config.archiveChannelId = channelId;
+      saveConfig(config);
+      return message.reply(`✅ Archive channel set to <#${channelId}>`);
+    }
+    
+    if (message.content.startsWith("!addchat ")) {
+  const config = loadConfig();
+
+  const isAdmin = (Array.isArray(config.adminRoles) ? config.adminRoles : []).some((roleId) =>
+    message.member.roles.cache.has(roleId)
+  );
+
+  if (!isAdmin)
+    return message.reply("❌ You don't have permission to use this command.");
+
+  const text = message.content.slice("!addchat ".length).trim();
+  if (!text)
+    return message.reply("⚠️ Please provide the text.\nExample: `!addchat Hello everyone!`");
+
+      message.delete().catch(() => {});
+
+  const guildName = message.guild.name;
+  const guildIcon = message.guild.iconURL({ dynamic: true });
+  const displayName = message.member.displayName || message.author.username;
+
+  const embed = new EmbedBuilder()
+    .setColor("#1ABC9C")
+    .setAuthor({
+      name: `${guildName}`,       
+      iconURL: guildIcon
+    })
+    .setDescription(text)             
+    .setFooter({
+      text: `${displayName} • ${new Date().toLocaleString()}`,
+    })
+    .setTimestamp();
+
+  return message.channel.send({ embeds: [embed] });
+}
+
+    if (message.content.startsWith("!copy ")) {
+    const args = message.content.split(" ");
+    const messageID = args[1];
+
+    if (!messageID) return message.reply("⚠️ Harap masukkan message ID.");
+
+    try {
+        const targetMsg = await message.channel.messages.fetch(messageID);
+
+        let content = targetMsg.content;
+
+        if (!content && targetMsg.embeds.length > 0) {
+            const embed = targetMsg.embeds[0];
+            content = embed.description || "(embed tidak punya text)";
+        }
+
+        if (!content) return message.reply("❌ Pesan tidak berisi teks.");
+
+        return message.channel.send(content);
+
+    } catch {
+        return message.reply("❌ Message ID tidak ditemukan di channel ini.");
+    }
+}
+
+    if (message.content.startsWith("!editchat ")) {
+    const args = message.content.split(" ");
+    const messageID = args[1];
+    const newText = message.content.slice(`!editchat ${messageID} `.length).trim();
+
+    if (!messageID) return message.reply("⚠️ Harap masukkan message ID.");
+    if (!newText) return message.reply("⚠️ Harap masukkan teks baru.");
+
+    try {
+        const msg = await message.channel.messages.fetch(messageID);
+
+        if (msg.author.id !== client.user.id)
+            return message.reply("❌ Bot hanya bisa mengedit pesan miliknya sendiri.");
+
+        const guildName = message.guild.name;
+        const guildIcon = message.guild.iconURL({ dynamic: true });
+        const usernameOnly = message.author.username;
+
+        const editedEmbed = new EmbedBuilder()
+            .setColor("#1ABC9C")
+            .setAuthor({ name: guildName, iconURL: guildIcon })
+            .setDescription(`${newText}`)
+            .setFooter({
+                text: `${displayName} • ${new Date().toLocaleString()}`
+            })
+            .setTimestamp();
+
+        await msg.edit({ embeds: [editedEmbed] });
+
+        return message.reply("✅ Pesan berhasil diperbarui.");
+
+    } catch (err) {
+        return message.reply("Tidak dapat mengedit pesan. Pastikan ID benar.");
+    }
+  }
+
+    if (message.content.startsWith("!setwelcome ")) {
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+    return message.reply("❌ You need Administrator permission to use this command.");
+
+  const args = message.content.split(" ");
+  const channelId = args[1]?.replace(/[<#>]/g, "");
+  const background = args[2] || null;
+
+  if (!channelId)
+    return message.reply("⚠️ Use: **!setwelcome #channel <background_url_optional>**");
+
+  const config = loadConfig();
+  config.welcomeChannel = channelId;
+  config.welcomeBackground = background;
+  saveConfig(config);
+
+  return message.reply(
+    `✅ Welcome channel set to <#${channelId}>\n` +
+    `🖼 Background: ${background ? background : "_No background set_"}`
+  );
+}
+
+    if (message.content.startsWith("!setgoodbye ")) {
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+    return message.reply("❌ You need Administrator permission to use this command.");
+
+  const args = message.content.split(" ");
+  const channelId = args[1]?.replace(/[<#>]/g, "");
+  const background = args[2] || null;
+
+  if (!channelId)
+    return message.reply("⚠️ Use: **!setgoodbye #channel <background_url_optional>**");
+
+  const config = loadConfig();
+  config.goodbyeChannel = channelId;
+  config.goodbyeBackground = background;
+  saveConfig(config);
+
+  return message.reply(
+    `✅ Goodbye channel set to <#${channelId}>\n` +
+    `🖼 Background: ${background ? background : "_No background set_"}`
+  );
+  }
+  });
+
+  client.on("guildMemberAdd", async (member) => {
+  try {
+    const config = loadConfig(); 
+
+    if (!config.welcomeChannel) return;
+
+    const channel = member.guild.channels.cache.get(config.welcomeChannel);
+    if (!channel) return;
+
+    const guildName = member.guild.name;
+    const avatar = member.user.displayAvatarURL({ dynamic: true });
+const embed = new EmbedBuilder()
+  .setColor("#00FFF0") 
+  .setDescription(`
+<a:koceng:1441979707632521296> **WELCOME ${member} IN ${guildName}** <a:koceng:1441979707632521296>
+
+<a:kanan:1441979773109665854> **Take Role In Here**
+<a:arrow:1441981304177561691> <#961045481977417819>
+<a:kanan:1441979773109665854> **Buy Jasa In Here**
+<a:arrow:1441981304177561691> <#1432736607169155072>
+<a:kanan:1441979773109665854> **Testi In Here**
+<a:arrow:1441981304177561691> <#1433716636208070758>
+<a:kanan:1441979773109665854> **Free Auto Post Here**
+<a:arrow:1441981304177561691> <#1451196979169460255>
+
+**Thanks For Joining My Server**
+  `)
+  .setThumbnail(avatar)
+  .setFooter({ text: `Member Count: ${member.guild.memberCount}` });
+
+    await channel.send({ embeds: [embed] });
+
+  } catch (err) {
+    console.error("WELCOME Error:", err);
+  }
+});
+
+  client.on("guildMemberRemove", async (member) => {
+  try {
+    const config = loadConfig(); 
+
+    if (!config.goodbyeChannel) return;
+
+    const channel = member.guild.channels.cache.get(config.goodbyeChannel);
+    if (!channel) return;
+
+    const avatar = member.user.displayAvatarURL({ dynamic: true });
+
+    const embed = new EmbedBuilder()
+      .setColor("#FF0000") 
+      .setDescription(
+        `**GOODBYE**\n\n` +
+        `Thanks For Join In **${member.guild.name}**\n\n` +
+        `Semoga Hidupmu Suram`
+      )
+      .setThumbnail(avatar)
+      .setFooter({ text: `User Left` });
+
+    await channel.send({ embeds: [embed] });
+    try {
+      await member.send(
+        `👋 **GOODBYE!**\nThanks for spending time in **${member.guild.name}**.\nIf you want to join again:\nhttps://discord.gg/AF3REYDqps`
+      );
+    } catch {
+    }
+
+  } catch (err) {
+    console.error("GOODBYE Error:", err);
+  }
+});
+
+  client.on("interactionCreate", async (interaction) => {
+    try {
+      if (interaction.isButton()) {
+        if (interaction.customId === "create_ticket") {
+          return await handleCreateTicket(interaction);
+        } else if (
+          interaction.customId === "price_jasa" ||
+          interaction.customId === "price_jasa"
+        ) {
+          const config = loadConfig();
+          if (config.priceJasaChannelId) {
+            return interaction.reply({
+              content: `🏆 **PRICE JASA**\n\nFor service price information, please check: <#${config.priceJasaChannelId}>`,
+              ephemeral: true,
+            });
+          } else {
+            return interaction.reply({
+              content:
+                "🏆 **PRICE JASA**\n\nService price channel not configured yet.\nAsk an administrator to set it up with `!setpricejasa <channel_id>`",
+              ephemeral: true,
+            });
+          }
+        } else if (interaction.customId === "price_lock") {
+          const config = loadConfig();
+          if (config.priceLockChannelId) {
+            return interaction.reply({
+              content: `🔒 **PRICE LOCK**\n\nFor price lock information, please check: <#${config.priceLockChannelId}>`,
+              ephemeral: true,
+            });
+          } else {
+            return interaction.reply({
+              content:
+                "🔒 **PRICE LOCK**\n\nPrice lock channel not configured yet.\nAsk an administrator to set it up with `!setpricelock <channel_id>`",
+              ephemeral: true,
+            });
+          }
+        } else if (interaction.customId === "close_ticket") {
+          return await handleCloseTicket(interaction);
+        } else if (interaction.customId === "claim_ticket") {
+          return await handleClaimTicket(interaction);
+        }
+      } else if (interaction.isStringSelectMenu()) {
+        if (interaction.customId === "ticket_role_select")
+          return await handleRoleSelect(interaction);
+      } else if (interaction.isModalSubmit()) {
+        if (interaction.customId === "ticket_modal")
+          return await handleTicketModalSubmit(interaction);
+        if (interaction.customId === "close_modal")
+          return await handleCloseModalSubmit(interaction);
+      }
+    } catch (error) {
+      console.error("Error handling interaction:", error);
+      try {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: "❌ An error occurred. Please try again.",
+            ephemeral: true,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to send error reply to interaction:", err);
+      }
+    }
+  });
+
+  client.on("error", (error) => {
+    console.error("Discord client error:", error);
+  });
+
+  process.on("unhandledRejection", (error) => {
+    console.error("Unhandled promise rejection:", error);
+  });
+}
+
+main().catch(console.error);
