@@ -662,10 +662,6 @@ async function main() {
     console.log("  !setpricejasa <channel_id> - Set PRICE JASA info channel");
     console.log("  !setpricelock <channel_id> - Set PRICE LOCK info channel");
   });
-}
-
-// Jalankan fungsi main
-main().catch(console.error);
 
   client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
@@ -1049,6 +1045,7 @@ const embed = new EmbedBuilder()
   process.on("unhandledRejection", (error) => {
     console.error("Unhandled promise rejection:", error);
   });
+  
 }
 
 main().catch(console.error);
